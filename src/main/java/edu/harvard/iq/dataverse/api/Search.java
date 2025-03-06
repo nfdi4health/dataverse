@@ -187,7 +187,7 @@ public class Search extends AbstractApiBean {
             }
 
             JsonObjectBuilder expanded = Json.createObjectBuilder();
-            if (expand) {
+            if (expand && solrQueryResponse.getExpandedSolrSearchResults() != null) {
                 for (String groupId : solrQueryResponse.getExpandedSolrSearchResults().keySet()) {
                     JsonArrayBuilder groupResults = Json.createArrayBuilder();
                     for (SolrSearchResult solrSearchResult : solrQueryResponse.getExpandedSolrSearchResults().get(groupId)) {
