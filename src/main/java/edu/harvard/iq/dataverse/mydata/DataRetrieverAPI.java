@@ -234,7 +234,8 @@ public class DataRetrieverAPI extends AbstractApiBean {
                     null,
                     false, // no need to request facets here ...
                     false, // ... same for highlights
-                    false  // ... same for group expansion
+                    false, // ... same for group expansion
+                    0
             );
         } catch (SearchException ex) {
             logger.severe("Search for total counts failed with filter query");

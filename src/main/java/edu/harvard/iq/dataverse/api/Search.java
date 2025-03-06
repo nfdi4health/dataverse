@@ -75,6 +75,7 @@ public class Search extends AbstractApiBean {
             @QueryParam("geo_radius") String geoRadiusRequested,
             @QueryParam("show_type_counts") boolean showTypeCounts,
             @QueryParam("expand") boolean expand,
+            @QueryParam("expand_rows") final int expandRows,
             @Context HttpServletResponse response
     ) {
 
@@ -158,7 +159,8 @@ public class Search extends AbstractApiBean {
                         geoRadius,
                         showFacets, // facets are expensive, no need to ask for them if not requested
                         showRelevance, // no need for highlights unless requested either
-                        expand
+                        expand,
+                        expandRows
                 );
             } catch (SearchException ex) {
                 Throwable cause = ex;

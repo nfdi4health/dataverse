@@ -143,7 +143,7 @@ public class SearchServiceBean {
             boolean retrieveEntities,
             String geoPoint,
             String geoRadius) throws SearchException {
-        return search(dataverseRequest, dataverses, query, filterQueries, sortField, sortOrder, paginationStart, onlyDatatRelatedToMe, numResultsPerPage, true, null, null, true, true, false);
+        return search(dataverseRequest, dataverses, query, filterQueries, sortField, sortOrder, paginationStart, onlyDatatRelatedToMe, numResultsPerPage, true, null, null, true, true, false, 0);
     }
 
     private SolrSearchResult solrDocumentToSolrSearchResult(
@@ -440,7 +440,8 @@ public class SearchServiceBean {
             String geoRadius,
             boolean addFacets,
             boolean addHighlights,
-            boolean expand
+            boolean expand,
+            int expandRows
     ) throws SearchException {
 
         if (paginationStart < 0) {
@@ -466,6 +467,7 @@ public class SearchServiceBean {
 
         if (expand) {
             solrQuery.setParam("expand", "true");
+            solrQuery.setParam("expand.rows", String.valueOf(expandRows));
         }
         
         /**
