@@ -307,7 +307,7 @@ public class SearchServiceBean {
             if (datasetDescriptions != null) {
                 String firstDatasetDescription = datasetDescriptions.get(0);
                 if (firstDatasetDescription != null) {
-                    solrSearchResult.setDescriptionNoSnippet(firstDatasetDescription);
+                    solrSearchResult.setDescriptionNoSnippet(String.join(" ", datasetDescriptions));
                 }
             }
             solrSearchResult.setDatasetVersionId(datasetVersionId);
