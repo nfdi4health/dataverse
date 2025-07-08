@@ -75,6 +75,8 @@ public class Search extends AbstractApiBean {
             @QueryParam("geo_radius") String geoRadiusRequested,
             @QueryParam("show_type_counts") boolean showTypeCounts,
             @QueryParam("show_collections") boolean showCollections,
+            @QueryParam("expand") boolean expand,
+            @QueryParam("expand_rows") final int expandRows,
             @Context HttpServletResponse response
     ) {
 
@@ -158,7 +160,9 @@ public class Search extends AbstractApiBean {
                         geoRadius,
                         showFacets, // facets are expensive, no need to ask for them if not requested
                         showRelevance, // no need for highlights unless requested either
-                        showCollections // same for collections
+                        showCollections, // same for collections
+                        expand,
+                        expandRows
                 );
             } catch (SearchException ex) {
                 Throwable cause = ex;
@@ -186,12 +190,33 @@ public class Search extends AbstractApiBean {
                 spelling_alternatives.add(entry.getKey(), entry.getValue().toString());
             }
 
+            JsonObjectBuilder expanded = Json.createObjectBuilder();
+            if (expand && solrQueryResponse.getExpandedSolrSearchResults() != null) {
+                for (String groupId : solrQueryResponse.getExpandedSolrSearchResults().keySet()) {
+                    JsonObjectBuilder expandedGroup = Json.createObjectBuilder();
+
+                    expandedGroup.add("total_count", solrQueryResponse.getNumExpandedSolrSearchResultsFound().get(groupId));
+
+                    JsonArrayBuilder expandedGroupItems = Json.createArrayBuilder();
+                    for (SolrSearchResult solrSearchResult : solrQueryResponse.getExpandedSolrSearchResults().get(groupId)) {
+                        expandedGroupItems.add(solrSearchResult.json(showRelevance, showEntityIds, showApiUrls, metadataFields));
+                    }
+                    expandedGroup.add("items", expandedGroupItems);
+
+                    expanded.add(groupId, expandedGroup);
+                }
+            }
+
             JsonObjectBuilder value = Json.createObjectBuilder()
                     .add("q", query)
                     .add("total_count", solrQueryResponse.getNumResultsFound())
                     .add("start", solrQueryResponse.getResultsStart())
                     .add("spelling_alternatives", spelling_alternatives)
                     .add("items", itemsArrayBuilder.build());
+
+            if (expand) {
+                value.add("expanded", expanded);
+            }
 
             if (showFacets) {
                 JsonArrayBuilder facets = Json.createArrayBuilder();

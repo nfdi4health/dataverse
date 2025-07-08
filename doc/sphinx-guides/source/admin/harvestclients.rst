@@ -68,4 +68,4 @@ Harvesting Client Changelog
 Harvesting Non-OAI-PMH
 ----------------------
 
-`DOI2PMH <https://github.com/IQSS/doi2pmh-server>`__ is a community-driven project intended to allow OAI-PMH harvesting from non-OAI-PMH sources.  
+`DOI2PMH <https://github.com/IQSS/doi2pmh-server>`__ is a community-driven project intended to allow OAI-PMH harvesting from non-OAI-PMH sources.

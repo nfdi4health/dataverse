@@ -15,7 +15,7 @@
             <f:viewAction action="#{dataverseSession.updateLocaleInViewRoot}"/>
             <f:viewAction action="#{DashboardMoveDatasetPage.init}"/>
             <f:viewAction action="#{dataverseHeaderFragment.initBreadcrumbs(dataverseServiceBean.findRootDataverse())}"/>
-            <f:viewAction action="#{dataverseHeaderFragment.addBreadcrumb('/dashboard.xhtml'.concat(empty param.dataverseId ? '': '?dataverseId='.concat(param.dataverseId)), bundle['dashboard.title'])}"/> 
+            <f:viewAction action="#{dataverseHeaderFragment.addBreadcrumb('/dashboard.xhtml'.concat(empty param.dataverseId ? '': '?dataverseId='.concat(param.dataverseId)), bundle['dashboard.title'])}"/>
             <f:viewAction action="#{dataverseHeaderFragment.addBreadcrumb(bundle['dashboard.card.move.dataset.manage'])}"/>
         </f:metadata>
 
@@ -131,7 +131,7 @@
                         <p class="text-warning"><span class="glyphicon glyphicon-warning-sign"/> #{bundle['dashboard.move.dataset.confirm.dialog']}</p>
                         <div class="button-block">
                             <p:commandButton styleClass="btn btn-default" value="#{bundle['dashboard.move.dataset.confirm.yes']}"
-                                             onclick="PF('moveDatasetConfirmation').hide();" 
+                                             onclick="PF('moveDatasetConfirmation').hide();"
                                              action="#{DashboardMoveDatasetPage.move()}"
                                              update="@form,:messagePanel" partialSubmit="true"/>
                             <button class="btn btn-link" onclick="PF('moveDatasetConfirmation').hide();" type="button">

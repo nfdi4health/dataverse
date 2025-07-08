@@ -115,7 +115,7 @@
                   <o:viewParam name="selectTab" value="#{DatasetPage.selectTab}" default="dataFilesTab"/>
                   <f:viewAction action="#{dataverseSession.updateLocaleInViewRoot}"/>
                   <f:viewAction action="#{DatasetPage.init}" rendered="true"/>
-                  <f:viewAction action="#{DatasetPage.viewActionInitBreadcrumbs()}"/> 
+                  <f:viewAction action="#{DatasetPage.viewActionInitBreadcrumbs()}"/>
                   <f:viewAction action="#{EditDatafilesPage.initCreateMode(DatasetPage.editMode, DatasetPage.workingVersion, DatasetPage.uploadInProgress, DatasetPage.newFiles, DatasetPage.uploadedFiles, DatasetPage.selectedFiles)}"/>
                 </f:metadata>
             </ui:define>
@@ -128,7 +128,7 @@
                 <o:importFunctions type="edu.harvard.iq.dataverse.util.MarkupChecker" />
                 <o:importConstants type="edu.harvard.iq.dataverse.settings.FeatureFlags" />
                 <ui:param name="versionNoteEnabled" value="#{FeatureFlags.VERSION_NOTE.enabled()}"/>
-                
+
                 <h:form id="datasetForm">
                     <h:inputHidden id="validateFilesOutcome" value="#{DatasetPage.validateFilesOutcome}" />
                     <h:inputHidden id="validTermsofAccess" value="#{DatasetPage.hasValidTermsOfAccess}" />
@@ -859,7 +859,7 @@
                                 $(this).ready(function () {
                                     refreshIfStillLocked();
                                 });
-                            
+
                                 var initialInterval = 5000; // 5 seconds
                                 var maxInterval = 300000; // 5 minutes
                                 var currentInterval = initialInterval;
@@ -894,7 +894,7 @@
                                         }
                                     }
                                 }
-                            
+
                                 function waitAndCheckLockAgain() {
                                     setTimeout(function () {
                                         // refresh the lock in the
@@ -1195,7 +1195,7 @@
                                     <f:param value="#{systemConfig.guidesBaseUrl}"/>
                                     <f:param value="#{systemConfig.guidesVersion}"/>
                                 </h:outputFormat>
-                                </p>                                                                   
+                                </p>
                             </p>
                             
                             <p>
@@ -1235,7 +1235,7 @@
                                  <h:outputText  styleClass="highlightBold" value="#{bundle['dataset.privateurl.anonymous.title']}"></h:outputText>
                                  <span class="glyphicon glyphicon-question-sign tooltip-icon"
                                        data-toggle="tooltip" data-placement="auto right" data-original-title="#{bundle['dataset.privateurl.anonymous.tooltip.preface']} #{DatasetPage.getAnonymizedFieldTypeNames()} "></span>
-                             </p>   
+                             </p>
                             <p>#{bundle['dataset.privateurl.anonymous.description']}</p>  
                             <p>#{bundle['dataset.privateurl.anonymous.description.paragraph.two']}</p>
                                  <h:outputFormat value="#{bundle['dataset.privateurl.anonymous.description.paragraph.three']}" escape="false">
@@ -2123,7 +2123,7 @@
                             <script>
                                 Cite.CSL.register.addTemplate("#{DatasetPage.requestedCSL}",
                                         "#{CSLUtil:getCitationFormat((DatasetPage.requestedCSL == '') ? 'apa' : DatasetPage.requestedCSL)}");
-                                
+
                                 document.getElementById('datasetForm:cslOutput').innerHTML = cite.format("bibliography", {
                                     format: "html",
                                     template: "#{DatasetPage.requestedCSL}",

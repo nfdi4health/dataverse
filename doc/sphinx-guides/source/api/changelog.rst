@@ -14,7 +14,7 @@ v6.6
 
   - "versionNote" -> "deaccessionNote"
   -  "archiveNote" --> "deaccessionLink"
-  - These may be non-null for deaccessioned versions and an optional new "versionNote" field indicating the reason a version was created may be present on any datasetversion. 
+  - These may be non-null for deaccessioned versions and an optional new "versionNote" field indicating the reason a version was created may be present on any datasetversion.
 
 - **/api/metadatablocks** is no longer returning duplicated metadata properties and does not omit metadata properties when called.
 - **/api/roles**: :ref:`show-role` now properly returns 403 Forbidden instead of 401 Unauthorized when you pass a working API token that doesn't have the right permission.

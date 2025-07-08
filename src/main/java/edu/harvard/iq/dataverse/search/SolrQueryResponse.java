@@ -15,6 +15,8 @@ public class SolrQueryResponse {
     private static final Logger logger = Logger.getLogger(SolrQueryResponse.class.getCanonicalName());
 
     private List<SolrSearchResult> solrSearchResults;
+    private Map<String, List<SolrSearchResult>> expandedSolrSearchResults;
+    private Map<String, Long> numExpandedSolrSearchResultsFound;
     private Long numResultsFound;
     private Long resultsStart;
     private Map<String, List<String>> spellingSuggestionsByToken;
@@ -46,6 +48,22 @@ public class SolrQueryResponse {
 
     public void setPublicationStatusCounts(FacetField facetField){        
         setFacetFieldCounts(facetField, this.publicationStatusCounts);
+    }
+
+    public Map<String, List<SolrSearchResult>> getExpandedSolrSearchResults() {
+        return expandedSolrSearchResults;
+    }
+
+    public void setExpandedSolrSearchResults(Map<String, List<SolrSearchResult>> expandedSolrSearchResults) {
+        this.expandedSolrSearchResults = expandedSolrSearchResults;
+    }
+
+    public Map<String, Long> getNumExpandedSolrSearchResultsFound() {
+        return numExpandedSolrSearchResultsFound;
+    }
+
+    public void setNumExpandedSolrSearchResultsFound(Map<String, Long> numExpandedSolrSearchResultsFound) {
+        this.numExpandedSolrSearchResultsFound = numExpandedSolrSearchResultsFound;
     }
     
     public Map<String, Long> getPublicationStatusCounts(){
