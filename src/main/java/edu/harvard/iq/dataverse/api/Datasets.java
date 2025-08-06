@@ -1087,23 +1087,28 @@ public class Datasets extends AbstractApiBean {
     @PUT
     @AuthRequired
     @Path("{id}/editMetadata")
-    public Response editVersionMetadata(@Context ContainerRequestContext crc, String jsonBody, @PathParam("id") String id, @QueryParam("replace") Boolean replace) {
+    public Response editVersionMetadata(@Context ContainerRequestContext crc, String jsonBody, @PathParam("id") String id, @QueryParam("replace") Boolean replace, @QueryParam("publish") Boolean publish) {
 
         Boolean replaceData = replace != null;
         DataverseRequest req = null;
         req = createDataverseRequest(getRequestUser(crc));
 
-        return processDatasetUpdate(jsonBody, id, req, replaceData);
+        return processDatasetUpdate(jsonBody, id, req, replaceData, publish);
     }
     
     
-    private Response processDatasetUpdate(String jsonBody, String id, DataverseRequest req, Boolean replaceData){
+    private Response processDatasetUpdate(String jsonBody, String id, DataverseRequest req, Boolean replaceData, Boolean publish){
         try {
            
             Dataset ds = findDatasetOrDie(id);
             JsonObject json = JsonUtil.getJsonObject(jsonBody);
             //Get the current draft or create a new version to update
-            DatasetVersion dsv = ds.getOrCreateEditVersion();
+            DatasetVersion dsv;
+            if (publish) {
+                dsv = ds.createNewDatasetVersion(null, null);
+            } else {
+                dsv = ds.getOrCreateEditVersion();
+            }
             dsv.getTermsOfUseAndAccess().setDatasetVersion(dsv);
             List<DatasetField> fields = new LinkedList<>();
             DatasetField singleField = null;
@@ -1205,9 +1210,19 @@ public class Datasets extends AbstractApiBean {
                     dsv.getDatasetFields().add(updateField);
                 }
             }
-            DatasetVersion managedVersion = execCommand(new UpdateDatasetVersionCommand(ds, req)).getLatestVersion();
+            if (publish) {
+                DatasetVersion latestVersion = ds.getLatestVersionForCopy();
 
-            return ok(json(managedVersion, true));
+                latestVersion.setDatasetFields(dsv.initDatasetFields());
+
+                latestVersion = datasetversionService.merge(latestVersion);
+
+                return ok(json(latestVersion, true));
+            } else {
+                DatasetVersion managedVersion = execCommand(new UpdateDatasetVersionCommand(ds, req)).getLatestVersion();
+
+                return ok(json(managedVersion, true));
+            }
 
         } catch (JsonParseException ex) {
             logger.log(Level.SEVERE, "Semantic error parsing dataset update Json: " + ex.getMessage(), ex);

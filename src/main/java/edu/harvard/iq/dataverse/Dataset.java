@@ -357,7 +357,7 @@ public class Dataset extends DvObjectContainer {
         this.versions = versions;
     }
 
-    private DatasetVersion createNewDatasetVersion(Template template, FileMetadata fmVarMet) {
+    public DatasetVersion createNewDatasetVersion(Template template, FileMetadata fmVarMet) {
         
         DatasetVersion dsv = new DatasetVersion();
         dsv.setVersionState(DatasetVersion.VersionState.DRAFT);
