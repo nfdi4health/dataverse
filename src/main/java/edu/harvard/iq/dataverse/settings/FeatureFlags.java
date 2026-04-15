@@ -253,7 +253,7 @@ public enum FeatureFlags {
     /**
      * Enables OIDC user property synchronization from the IdP to Dataverse.
      * When enabled, user properties (first name, last name, email, email_verified)
-     * are updated from OIDC UserInfo claims every time the user authenticates,
+     * are updated from OIDC UserInfo claims every time the user makes an authenticated request,
      * keeping Dataverse data in sync with the IdP.
      * When disabled (default), user properties are only set during initial account
      * creation and are never updated afterward, even if they change at the IdP.
