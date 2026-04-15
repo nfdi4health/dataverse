@@ -1030,6 +1030,11 @@ public class AuthenticationServiceBean {
     }
 
     private AuthenticatedUser syncUserProperties(AuthenticatedUser user, OAuth2UserRecord record) {
+        if (!FeatureFlags.OIDC_USER_PROPERTY_SYNC.enabled()) {
+            logger.fine("OIDC user property sync is disabled (feature flag not raised)");
+            return user;
+        }
+
         boolean changed = false;
 
         if (record.getDisplayInfo() != null) {
