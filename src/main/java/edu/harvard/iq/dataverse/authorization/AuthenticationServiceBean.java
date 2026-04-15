@@ -1047,7 +1047,7 @@ public class AuthenticationServiceBean {
             }
         }
 
-        String newEmail = StringUtils.trimToNull(getFirstEmail(record));
+        String newEmail = StringUtils.trimToNull(resolveEmail(record));
         if (newEmail != null && !equalsIgnoreCaseSafe(newEmail, user.getEmail())) {
             user.setEmail(newEmail);
             changed = true;
@@ -1060,11 +1060,25 @@ public class AuthenticationServiceBean {
         return user;
     }
 
-    private String getFirstEmail(OAuth2UserRecord record) {
-        List<String> emails = record.getAvailableEmailAddresses();
-        return (emails != null && !emails.isEmpty()) ? emails.get(0) : null;
+    private String resolveEmail(OAuth2UserRecord record) {
+        if (record.getDisplayInfo() != null) {
+            String displayEmail = StringUtils.trimToNull(record.getDisplayInfo().getEmailAddress());
+            if (displayEmail != null) {
+                return displayEmail;
+            }
+        }
+        // fallback
+        return StringUtils.trimToNull(getFirstEmail(record));
     }
 
+
+    private String getFirstEmail(OAuth2UserRecord record) {
+        List<String> emails = record.getAvailableEmailAddresses();
+        if (emails == null || emails.isEmpty()) {
+            return null;
+        }
+        return emails.get(0);
+    }
 
     /**
      * Null-safe, case-insensitive comparison for email addresses.
