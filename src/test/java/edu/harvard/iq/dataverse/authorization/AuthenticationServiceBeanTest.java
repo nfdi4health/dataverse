@@ -131,6 +131,7 @@ public class AuthenticationServiceBeanTest {
     }
 
     @Test
+    @JvmSetting(key = JvmSettings.FEATURE_FLAG, value = "true", varArgs = "oidc-user-property-sync")
     void testLookupUserByOIDCBearerToken_oneProvider_validToken_updatesUserProperties() throws ParseException, IOException, AuthorizationException, OAuth2Exception {
         // Given a single OIDC provider that returns a valid user identifier with updated properties
         OAuth2UserRecord record = setupOidcUserRecordBasics();
@@ -158,6 +159,7 @@ public class AuthenticationServiceBeanTest {
     }
 
     @Test
+    @JvmSetting(key = JvmSettings.FEATURE_FLAG, value = "true", varArgs = "oidc-user-property-sync")
     void testLookupUserByOIDCBearerToken_oneProvider_validToken_noPropertyChanges_doesNotSave() throws ParseException, IOException, AuthorizationException, OAuth2Exception {
         // Given a single OIDC provider that returns a valid user identifier with same properties
         OAuth2UserRecord record = setupOidcUserRecordBasics();
@@ -180,6 +182,7 @@ public class AuthenticationServiceBeanTest {
     }
 
     @Test
+    @JvmSetting(key = JvmSettings.FEATURE_FLAG, value = "true", varArgs = "oidc-user-property-sync")
     void testLookupUserByOIDCBearerToken_oneProvider_validToken_onlyEmailChanges() throws ParseException, IOException, AuthorizationException, OAuth2Exception {
         // Given a single OIDC provider that returns a valid user identifier with updated email only
         OAuth2UserRecord record = setupOidcUserRecordBasics();
@@ -204,6 +207,7 @@ public class AuthenticationServiceBeanTest {
     }
 
     @Test
+    @JvmSetting(key = JvmSettings.FEATURE_FLAG, value = "true", varArgs = "oidc-user-property-sync")
     void testLookupUserByOIDCBearerToken_oneProvider_validToken_displayInfoNull_doesNotUpdateNames() throws ParseException, IOException, AuthorizationException, OAuth2Exception {
         // Given a single OIDC provider that returns no display info but a valid email
         OAuth2UserRecord record = setupOidcUserRecordBasics();
@@ -228,6 +232,7 @@ public class AuthenticationServiceBeanTest {
     }
 
     @Test
+    @JvmSetting(key = JvmSettings.FEATURE_FLAG, value = "true", varArgs = "oidc-user-property-sync")
     void testLookupUserByOIDCBearerToken_oneProvider_validToken_emailNullInRecord_doesNotUpdateEmail() throws ParseException, IOException, AuthorizationException, OAuth2Exception {
         // Given a single OIDC provider that returns a valid user identifier with no email
         OAuth2UserRecord record = setupOidcUserRecordBasics();
