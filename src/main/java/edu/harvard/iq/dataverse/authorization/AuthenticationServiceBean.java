@@ -1053,6 +1053,17 @@ public class AuthenticationServiceBean {
             changed = true;
         }
 
+        Boolean emailVerified = record.getEmailVerified();
+        if (emailVerified != null) {
+            if (emailVerified && user.getEmailConfirmed() == null) {
+                user.setEmailConfirmed(new Timestamp(System.currentTimeMillis()));
+                changed = true;
+            } else if (!emailVerified && user.getEmailConfirmed() != null) {
+                user.setEmailConfirmed(null);
+                changed = true;
+            }
+        }
+
         if (changed) {
             return userService.save(user);
         }

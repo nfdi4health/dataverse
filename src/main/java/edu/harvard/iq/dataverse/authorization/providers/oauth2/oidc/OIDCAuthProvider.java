@@ -241,6 +241,9 @@ public class OIDCAuthProvider extends AbstractOAuth2AuthenticationProvider {
         String idp = (idpObj != null) ? idpObj.toString() : null;
         String oidcUserId = (oidcUserIdObj != null) ? oidcUserIdObj.toString() : null;
 
+        Object emailVerifiedObj = userInfo.getClaim(OAuth2UserRecord.EMAIL_VERIFIED_CLAIM_NAME);
+        Boolean emailVerified = emailVerifiedObj instanceof Boolean ? (Boolean) emailVerifiedObj : null;
+
         // Build display info from user attributes
         AuthenticatedUserDisplayInfo displayInfo = new AuthenticatedUserDisplayInfo(
                 userInfo.getGivenName(),
@@ -259,7 +262,8 @@ public class OIDCAuthProvider extends AbstractOAuth2AuthenticationProvider {
                 oidcUserId,
                 null,
                 displayInfo,
-                null
+                null,
+                emailVerified
         );
     }
 
