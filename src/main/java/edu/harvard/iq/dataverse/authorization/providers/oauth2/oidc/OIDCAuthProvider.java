@@ -38,6 +38,7 @@ import edu.harvard.iq.dataverse.authorization.providers.oauth2.AbstractOAuth2Aut
 import edu.harvard.iq.dataverse.authorization.providers.oauth2.OAuth2Exception;
 import edu.harvard.iq.dataverse.authorization.providers.oauth2.OAuth2UserRecord;
 import edu.harvard.iq.dataverse.authorization.providers.shib.ShibUtil;
+import edu.harvard.iq.dataverse.settings.FeatureFlags;
 import edu.harvard.iq.dataverse.settings.JvmSettings;
 import edu.harvard.iq.dataverse.util.BundleUtil;
 
@@ -241,8 +242,12 @@ public class OIDCAuthProvider extends AbstractOAuth2AuthenticationProvider {
         String idp = (idpObj != null) ? idpObj.toString() : null;
         String oidcUserId = (oidcUserIdObj != null) ? oidcUserIdObj.toString() : null;
 
-        Object emailVerifiedObj = userInfo.getClaim(OAuth2UserRecord.EMAIL_VERIFIED_CLAIM_NAME);
-        Boolean emailVerified = emailVerifiedObj instanceof Boolean ? (Boolean) emailVerifiedObj : null;
+        // Only extract email_verified claim if sync feature is enabled
+        Boolean emailVerified = null;
+        if (FeatureFlags.OIDC_USER_PROPERTY_SYNC.enabled()) {
+            Object emailVerifiedObj = userInfo.getClaim(OAuth2UserRecord.EMAIL_VERIFIED_CLAIM_NAME);
+            emailVerified = emailVerifiedObj instanceof Boolean ? (Boolean) emailVerifiedObj : null;
+        }
 
         // Build display info from user attributes
         AuthenticatedUserDisplayInfo displayInfo = new AuthenticatedUserDisplayInfo(
