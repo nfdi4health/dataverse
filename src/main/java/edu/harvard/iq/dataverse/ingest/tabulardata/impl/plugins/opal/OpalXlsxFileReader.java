@@ -40,7 +40,7 @@ import java.util.logging.Logger;
  * Sections:
  * [universe] → entityType (→ vm.setUniverse → DDI <universe>)
  * [concepts] → Mlstr_area / additional fields (→ DDI <concept>)
- * [notes]    → labels + table info (→ DDI <notes>) TODO
+ * [notes]    → labels + table info (→ DDI <notes>) TODO write all data that is not catched in notes
  *
  * Categories are linked via table::variable key.
  */
@@ -56,7 +56,7 @@ public class OpalXlsxFileReader extends TabularDataFileReader {
     public static final String SECTION_CONCEPTS  = "[concepts]";
     public static final String SECTION_NOTES     = "[notes]";
 
-    // Column name constants – Variables sheet (lower-cased for map lookup) TODO make it dynamic
+    // Column name constants – Variables sheet (lower-cased for map lookup)
     private static final String COL_TABLE       = "table";
     private static final String COL_NAME        = "name";
     private static final String COL_VALUE_TYPE  = "valuetype";
