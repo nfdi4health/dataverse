@@ -1048,7 +1048,7 @@ public class JsonPrinter {
             .add("fileEndPosition", dv.getFileEndPosition())
             .add("recordSegmentNumber", dv.getRecordSegmentNumber())
             .add("numberOfDecimalPoints",dv.getNumberOfDecimalPoints())
-            .add("variableMetadata",jsonVarMetadata(dv.getVariableMetadatas()))
+            .add("variableMetadata", dv.getVariableMetadatas() == null ? null : jsonVarMetadata(dv.getVariableMetadatas()))
             .add("invalidRanges", dv.getInvalidRanges().isEmpty() ? null : JsonPrinter.jsonInvalidRanges(dv.getInvalidRanges()))
             .add("summaryStatistics", dv.getSummaryStatistics().isEmpty() ? null : JsonPrinter.jsonSumStat(dv.getSummaryStatistics()))
             .add("variableCategories", dv.getCategories().isEmpty() ? null : JsonPrinter.jsonCatStat(dv.getCategories()))
@@ -1132,8 +1132,10 @@ public class JsonPrinter {
                     .add("postQuestion", vm.getPostquestion())
                     .add("universe", vm.getUniverse())
                     .add("notes", vm.getNotes())
+                    .add("concepts", vm.getConcepts())
+                    .add("metadata", vm.getMetadata())
                     .add("categoryMetadatas",json(vm.getCategoriesMetadata()));
-            JsonArrayBuilder jab = Json.createArrayBuilder();
+            vmArr.add(vmJson);
         }
         return vmArr;
     }

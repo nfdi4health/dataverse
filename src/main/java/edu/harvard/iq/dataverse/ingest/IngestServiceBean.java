@@ -24,8 +24,7 @@ import edu.harvard.iq.dataverse.AuxiliaryFile;
 import edu.harvard.iq.dataverse.AuxiliaryFileServiceBean;
 import edu.harvard.iq.dataverse.ControlledVocabularyValue;
 import edu.harvard.iq.dataverse.authorization.users.User;
-import edu.harvard.iq.dataverse.datavariable.VariableCategory;
-import edu.harvard.iq.dataverse.datavariable.VariableServiceBean;
+import edu.harvard.iq.dataverse.datavariable.*;
 import edu.harvard.iq.dataverse.DatasetServiceBean;
 import edu.harvard.iq.dataverse.Dataset;
 import edu.harvard.iq.dataverse.DataFile;
@@ -51,8 +50,7 @@ import edu.harvard.iq.dataverse.dataaccess.S3AccessIO;
 import edu.harvard.iq.dataverse.dataaccess.TabularSubsetGenerator;
 import edu.harvard.iq.dataverse.datasetutility.FileExceedsMaxSizeException;
 import static edu.harvard.iq.dataverse.datasetutility.FileSizeChecker.bytesToHumanReadable;
-import edu.harvard.iq.dataverse.datavariable.SummaryStatistic;
-import edu.harvard.iq.dataverse.datavariable.DataVariable;
+
 import edu.harvard.iq.dataverse.ingest.metadataextraction.FileMetadataExtractor;
 import edu.harvard.iq.dataverse.ingest.metadataextraction.FileMetadataIngest;
 import edu.harvard.iq.dataverse.ingest.metadataextraction.impl.plugins.fits.FITSFileMetadataExtractor;
@@ -66,6 +64,8 @@ import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.rdata.RDATAFileR
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.rdata.RDATAFileReaderSpi;
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.csv.CSVFileReader;
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.csv.CSVFileReaderSpi;
+import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.opal.OpalXlsxFileReader;
+import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.opal.OpalXlsxFileReaderSpi;
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.xlsx.XLSXFileReader;
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.xlsx.XLSXFileReaderSpi;
 import edu.harvard.iq.dataverse.ingest.tabulardata.impl.plugins.sav.SAVFileReader;
@@ -100,19 +100,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.ListIterator;
+import java.util.*;
 import java.util.logging.Logger;
-import java.util.Hashtable;
-import java.util.Optional;
+
 import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.inject.Named;
@@ -1123,6 +1113,16 @@ public class IngestServiceBean {
                 tabDataIngest.getDataTable().setDataFile(dataFile);
                 tabDataIngest.getDataTable().setOriginalFileName(originalFileName);
                 dataFile.getDataTable().setStoredWithVariableHeader(storingWithVariableHeader);
+
+                FileMetadata fileMetadata = dataFile.getFileMetadata();
+
+                for (DataVariable dv : dataFile.getDataTable().getDataVariables()) {
+                    if (dv.getOpalMetadata() == null || dv.getOpalMetadata().isBlank()) {
+                        continue;
+                    }
+                    VariableMetadata vm = new VariableMetadata(dv, fileMetadata);
+                    dv.getVariableMetadatas().add(vm);
+                }
                 
                 try {
                     produceSummaryStatistics(dataFile, tabFile);
@@ -1310,6 +1310,8 @@ public class IngestServiceBean {
             ingestPlugin = new CSVFileReader(new CSVFileReaderSpi(), ',');
         } else if (mimeType.equals(FileUtil.MIME_TYPE_TSV) /*|| mimeType.equals(FileUtil.MIME_TYPE_TSV_ALT)*/) {
             ingestPlugin = new CSVFileReader(new CSVFileReaderSpi(), '\t');
+        } else if (mimeType.equals(FileUtil.MIME_TYPE_OPAL_XLSX)) {
+            ingestPlugin = new OpalXlsxFileReader(new OpalXlsxFileReaderSpi());
         }  else if (mimeType.equals(FileUtil.MIME_TYPE_XLSX)) {
             ingestPlugin = new XLSXFileReader(new XLSXFileReaderSpi());
         } else if (mimeType.equals(FileUtil.MIME_TYPE_SPSS_SAV)) {
@@ -2263,7 +2265,6 @@ public class IngestServiceBean {
             logger.warning("DataFile id=" + fileId + ": No such DataFile!");
         }
     }
-    
     // This method fixes a datatable object that's missing the size of the 
     // ingested original. 
     private void fixMissingOriginalSize(long fileId) {

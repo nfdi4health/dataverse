@@ -1896,6 +1896,37 @@ public class DdiExportUtil {
         }
 
         if (vm != null) {
+            if (vm.containsKey("concepts") && vm.getString("concepts") != null) {
+                String concepts = vm.getString("concepts");
+                if (concepts.startsWith("[") && concepts.endsWith("]")) {
+                    try {
+                        JsonArray conceptArray = JsonUtil.getJsonArray(concepts);
+                        for (JsonValue val : conceptArray) {
+                            if (val.getValueType() == JsonValue.ValueType.OBJECT) {
+                                JsonObject concept = val.asJsonObject();
+                                xmlw.writeStartElement("concept");
+                                if (concept.containsKey("vocab") && !concept.getString("vocab").isEmpty()) {
+                                    xmlw.writeAttribute("vocab", concept.getString("vocab"));
+                                }
+                                if (concept.containsKey("vocabURI") && !concept.getString("vocabURI").isEmpty()) {
+                                    xmlw.writeAttribute("vocabURI", concept.getString("vocabURI"));
+                                }
+                                if (concept.containsKey("content")) {
+                                    xmlw.writeCharacters(concept.getString("content"));
+                                }
+                                xmlw.writeEndElement(); //concept
+                            }
+                        }
+                    } catch (Exception e) {
+                        // ignore
+                    }
+                }
+            }
+            if (vm.containsKey("metadata") && vm.getString("metadata") != null) {
+                xmlw.writeStartElement("notes");
+                xmlw.writeCData(vm.getString("metadata"));
+                xmlw.writeEndElement(); //notes CDATA
+            }
             if (vm.containsKey("notes")) {
                 xmlw.writeStartElement("notes");
                 xmlw.writeCData(vm.getString("notes"));

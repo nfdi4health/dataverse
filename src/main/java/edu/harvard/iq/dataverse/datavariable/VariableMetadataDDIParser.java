@@ -3,6 +3,11 @@ package edu.harvard.iq.dataverse.datavariable;
 
 import edu.harvard.iq.dataverse.FileMetadata;
 
+import edu.harvard.iq.dataverse.util.json.JsonUtil;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonValue;
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
@@ -119,7 +124,9 @@ public class VariableMetadataDDIParser {
                     processUniverse(xmlr, newVM);
                 } else if (xmlr.getLocalName().equals("notes")) {
                     processNote(xmlr, newVM);
-                }  else if (xmlr.getLocalName().equals("catgry")) {
+                } else if (xmlr.getLocalName().equals("concept")) {
+                    processConcept(xmlr, newVM);
+                } else if (xmlr.getLocalName().equals("catgry")) {
                     processCatgry(xmlr, newVM);
                 }
 
@@ -187,9 +194,39 @@ public class VariableMetadataDDIParser {
         String note = parseText(xmlr,false);
 
         if (unf_type == null )  {
+            // If we already have JSON concepts in notes, we might want to append this as a "plain" note.
+            // But for now, we just overwrite as per original logic.
             newVM.setNotes(note);
         }
         return;
+    }
+
+    private void processConcept(XMLStreamReader xmlr, VariableMetadata newVM) throws XMLStreamException {
+        String vocab = xmlr.getAttributeValue(null, "vocab");
+        String vocabURI = xmlr.getAttributeValue(null, "vocabURI");
+        String content = parseText(xmlr, false);
+
+        String existingConcepts = newVM.getConcepts();
+        JsonArrayBuilder arrayBuilder = Json.createArrayBuilder();
+
+        if (existingConcepts != null && existingConcepts.startsWith("[") && existingConcepts.endsWith("]")) {
+            try {
+                JsonArray existingArray = JsonUtil.getJsonArray(existingConcepts);
+                for (JsonValue val : existingArray) {
+                    arrayBuilder.add(val);
+                }
+            } catch (Exception e) {
+                // If it wasn't valid JSON after all, just start fresh
+            }
+        }
+
+        arrayBuilder.add(Json.createObjectBuilder()
+                .add("vocab", vocab != null ? vocab : "")
+                .add("vocabURI", vocabURI != null ? vocabURI : "")
+                .add("content", content != null ? content : "")
+                .build());
+
+        newVM.setConcepts(arrayBuilder.build().toString());
     }
 
     private void processCatgry(XMLStreamReader xmlr, VariableMetadata newVM) throws XMLStreamException {
