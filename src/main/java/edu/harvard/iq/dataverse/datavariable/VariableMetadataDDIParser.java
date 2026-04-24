@@ -216,7 +216,7 @@ public class VariableMetadataDDIParser {
                     arrayBuilder.add(val);
                 }
             } catch (Exception e) {
-                // If it wasn't valid JSON after all, just start fresh
+                // TODO: Replace JSON-string based concept handling with proper object storage (Concept model)
             }
         }
 
