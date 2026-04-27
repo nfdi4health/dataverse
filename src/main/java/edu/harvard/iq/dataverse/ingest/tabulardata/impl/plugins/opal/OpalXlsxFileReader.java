@@ -33,8 +33,8 @@ import java.util.logging.Logger;
  * - "Variables" sheet → variables + metadata (labels, Mlstr_area, etc.)
  * - "Categories" sheet → category values per variable
  *
- * Temporary storage (opalMetadata):
- * OPAL fields are stored as key=value blocks in DataVariable.opalMetadata TODO
+ * Temporary storage (ingestMetadata):
+ * OPAL fields are stored as key=value blocks in DataVariable.ingestMetadata TODO
  * during ingest and later mapped to VariableMetadata.
  *
  * Sections:
@@ -202,7 +202,7 @@ public class OpalXlsxFileReader extends TabularDataFileReader {
             }
 
             if (opalMeta.length() > 0) {
-                dv.setOpalMetadata(opalMeta.toString().trim());
+                dv.setIngestMetadata(opalMeta.toString().trim());
             }
 
             variables.add(dv);

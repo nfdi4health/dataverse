@@ -196,14 +196,14 @@ public class DataVariable implements Serializable {
     private Collection<VariableMetadata> variableMetadatas;
 
     @Transient
-    private String opalMetadata;
+    private String ingestMetadata;
 
-    public String getOpalMetadata() {
-        return opalMetadata;
+    public String getIngestMetadata() {
+        return ingestMetadata;
     }
 
-    public void setOpalMetadata(String opalMetadata) {
-        this.opalMetadata = opalMetadata;
+    public void setIngestMetadata(String ingestMetadata) {
+        this.ingestMetadata = ingestMetadata;
     }
 
     public DataVariable() {

@@ -76,7 +76,6 @@ import edu.harvard.iq.dataverse.settings.JvmSettings;
 import edu.harvard.iq.dataverse.storageuse.StorageUseServiceBean;
 import edu.harvard.iq.dataverse.storageuse.UploadSessionQuotaLimit;
 import edu.harvard.iq.dataverse.util.*;
-import edu.harvard.iq.dataverse.util.file.FileExceedsStorageQuotaException;
 
 import org.apache.commons.io.IOUtils;
 //import edu.harvard.iq.dvn.unf.*;
@@ -117,7 +116,6 @@ import jakarta.jms.QueueSession;
 import jakarta.jms.Message;
 import jakarta.faces.application.FacesMessage;
 import jakarta.ws.rs.core.MediaType;
-import java.text.MessageFormat;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.NetcdfFiles;
 
@@ -1117,7 +1115,7 @@ public class IngestServiceBean {
                 FileMetadata fileMetadata = dataFile.getFileMetadata();
 
                 for (DataVariable dv : dataFile.getDataTable().getDataVariables()) {
-                    if (dv.getOpalMetadata() == null || dv.getOpalMetadata().isBlank()) {
+                    if (dv.getIngestMetadata() == null || dv.getIngestMetadata().isBlank()) {
                         continue;
                     }
                     VariableMetadata vm = new VariableMetadata(dv, fileMetadata);

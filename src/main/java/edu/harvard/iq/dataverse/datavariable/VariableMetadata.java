@@ -126,8 +126,8 @@ public class VariableMetadata implements Serializable  {
         this.dataVariable = dataVariable;
         this.fileMetadata = fileMetadata;
         categoriesMetadata = new ArrayList<CategoryMetadata>() ;
-        if (dataVariable != null && dataVariable.getOpalMetadata() != null) {
-            populateFromOpalMetadata(dataVariable.getOpalMetadata());
+        if (dataVariable != null && dataVariable.getIngestMetadata() != null) {
+            populateFromOpalMetadata(dataVariable.getIngestMetadata());
         }
     }
     private static String resolveConceptIri(String vocab, String content) {
