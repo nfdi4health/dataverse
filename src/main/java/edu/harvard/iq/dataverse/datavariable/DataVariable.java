@@ -8,22 +8,12 @@ package edu.harvard.iq.dataverse.datavariable;
 
 import java.io.Serializable;
 import java.util.Collection;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+
+import jakarta.persistence.*;
 import org.hibernate.validator.constraints.NotBlank;
 import edu.harvard.iq.dataverse.DataTable;
 import java.util.ArrayList;
 import java.util.List;
-import jakarta.persistence.Column;
-import jakarta.persistence.Index;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.Table;
 
 /**
  *
@@ -204,8 +194,20 @@ public class DataVariable implements Serializable {
 
     @OneToMany (mappedBy="dataVariable", cascade={ CascadeType.REMOVE, CascadeType.MERGE,CascadeType.PERSIST})
     private Collection<VariableMetadata> variableMetadatas;
-    
+
+    @Transient
+    private String ingestMetadata;
+
+    public String getIngestMetadata() {
+        return ingestMetadata;
+    }
+
+    public void setIngestMetadata(String ingestMetadata) {
+        this.ingestMetadata = ingestMetadata;
+    }
+
     public DataVariable() {
+        this.categories = new ArrayList<>();
     }
     
     /** Creates a new instance of DataVariable
