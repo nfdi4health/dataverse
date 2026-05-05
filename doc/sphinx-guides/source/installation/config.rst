@@ -3938,6 +3938,9 @@ please find all known feature flags below. Any of these flags can be activated u
     * - only-update-datacite-when-needed
       - Only contact DataCite to update a DOI after checking to see if DataCite has outdated information (for efficiency, lighter load on DataCite, especially when using file DOIs).
       - ``Off``
+    * - oidc-user-property-sync
+      - Enables synchronization of user properties from the OIDC identity provider to the Dataverse user during authentication. When enabled, first name, last name, email address, and email verification state are updated from OIDC claims on each authenticated request. Updates are only applied if values have changed. The email verification state is derived from the optional ``email_verified`` claim.
+      - ``Off``
 
 **Note:** Feature flags can be set via any `supported MicroProfile Config API source`_, e.g. the environment variable
 ``DATAVERSE_FEATURE_XXX`` (e.g. ``DATAVERSE_FEATURE_API_SESSION_AUTH=1``). These environment variables can be set in your shell before starting Payara. If you are using :doc:`Docker for development </container/dev-usage>`, you can set them in the `docker compose <https://docs.docker.com/compose/environment-variables/set-environment-variables/>`_ file.
