@@ -861,6 +861,10 @@ public class Datasets extends AbstractApiBean {
                 if (!hasValidTerms) {
                     return error(Status.CONFLICT, BundleUtil.getStringFromBundle("dataset.message.toua.invalid"));
                 }
+                DatasetVersion latestVersion = ds.getLatestVersion();
+                if (isDatasetVersionNoOp(incomingVersion, latestVersion)) {
+                    return ok(json(latestVersion, true));
+                }
                 managedVersion = execCommand(new CreateDatasetVersionCommand(req, ds, incomingVersion));
             }
             return ok( json(managedVersion, true) );
@@ -873,6 +877,16 @@ public class Datasets extends AbstractApiBean {
             return ex.getResponse();
 
         }
+    }
+
+    // Helper extracted to make no-op detection testable.
+    static boolean isDatasetVersionNoOp(DatasetVersion incomingVersion, DatasetVersion latestVersion) {
+        DatasetVersionDifference diff = new DatasetVersionDifference(incomingVersion, latestVersion);
+        TermsOfUseAndAccess incomingTermsofUseAndAccess = incomingVersion.getTermsOfUseAndAccess();
+        TermsOfUseAndAccess currentTermsofUseAndAccess = latestVersion.getTermsOfUseAndAccess();
+        boolean sameFileAccess = (incomingTermsofUseAndAccess != null && incomingTermsofUseAndAccess.isFileAccessRequest())
+                == (currentTermsofUseAndAccess != null && currentTermsofUseAndAccess.isFileAccessRequest());
+        return diff.getDetailDataByBlock().isEmpty() && diff.getChangedTermsAccess().isEmpty() && sameFileAccess;
     }
 
     @GET
