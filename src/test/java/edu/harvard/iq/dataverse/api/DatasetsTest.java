@@ -1,6 +1,8 @@
 package edu.harvard.iq.dataverse.api;
 
 import org.junit.jupiter.api.Test;
+import edu.harvard.iq.dataverse.DatasetVersion;
+import edu.harvard.iq.dataverse.TermsOfUseAndAccess;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -8,8 +10,27 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 public class DatasetsTest {
+
+    @Test
+    public void testIsDatasetVersionNoOp() {
+        DatasetVersion v1 = new DatasetVersion();
+        DatasetVersion v2 = new DatasetVersion();
+
+        assertTrue(Datasets.isDatasetVersionNoOp(v1, v2));
+
+        TermsOfUseAndAccess toua1 = new TermsOfUseAndAccess();
+        toua1.setFileAccessRequest(true);
+        v1.setTermsOfUseAndAccess(toua1);
+
+        TermsOfUseAndAccess toua2 = new TermsOfUseAndAccess();
+        toua2.setFileAccessRequest(false);
+        v2.setTermsOfUseAndAccess(toua2);
+
+        assertFalse(Datasets.isDatasetVersionNoOp(v1, v2));
+    }
 
     /**
      * Test cleanup filter
