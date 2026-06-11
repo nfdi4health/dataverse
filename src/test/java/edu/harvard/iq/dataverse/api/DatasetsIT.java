@@ -7544,6 +7544,9 @@ createDataset = UtilIT.createRandomDatasetViaNativeApi(dataverse1Alias, apiToken
     public void testUpdateDatasetMetadataNoOp() {
         String apiToken = getSuperuserToken();
         String collectionAlias = UtilIT.createRandomCollectionGetAlias(apiToken);
+        UtilIT.publishDataverseViaNativeApi(collectionAlias, apiToken)
+                .then().assertThat().statusCode(OK.getStatusCode());
+
         String updateJsonFile = "doc/sphinx-guides/source/_static/api/dataset-update-metadata.json";
 
         // 1. Create a dataset and update it with known metadata from a file
