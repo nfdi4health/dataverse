@@ -216,7 +216,7 @@ Note that using this method, you may redeploy a complete WAR or single methods.
 Redeploying WARs supports swapping and adding classes and non-code materials, but is slower (still faster than rebuilding containers).
 Hotswapping methods requires using JDWP (Debug Mode), but does not allow switching non-code material or adding classes.
 
-#. | Download the version of Payara shown in :ref:`install-payara-dev` and unzip it to a reasonable location such as ``/usr/local/payara6``.
+#. | Download the version of Payara shown in :ref:`install-payara-dev` and unzip it to a reasonable location such as ``/usr/local/payara7``.
    | - Note that Payara can also be downloaded from `Maven Central <https://mvnrepository.com/artifact/fish.payara.distributions/payara>`_.
    | - Note that another way to check the expected version of Payara is to run this command:
    |   ``mvn help:evaluate -Dexpression=payara.version -q -DforceStdout``
@@ -247,7 +247,7 @@ Hotswapping methods requires using JDWP (Debug Mode), but does not allow switchi
    .. tabs::
      .. group-tab:: Netbeans
 
-        Launch Netbeans and click "Tools" and then "Servers". Click "Add Server" and select "Payara Server" and set the installation location to ``/usr/local/payara6`` (or wherever you unzipped Payara). Choose "Remote Domain". Use the settings in the screenshot below. Most of the defaults are fine.
+        Launch Netbeans and click "Tools" and then "Servers". Click "Add Server" and select "Payara Server" and set the installation location to ``/usr/local/payara7`` (or wherever you unzipped Payara). Choose "Remote Domain". Use the settings in the screenshot below. Most of the defaults are fine.
 
         Under "Common", the username and password should be "admin". Make sure "Enable Hot Deploy" is checked.
 
@@ -403,6 +403,80 @@ The steps below describe options to enable the later in different IDEs.
 
     **IMPORTANT**: This tool uses a Bash shell script and is thus limited to Mac and Linux OS.
 
+.. _dev-fast-redeploy:
+
+Fast Redeploy (Command-Line)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For developers who prefer command-line workflows over IDE integration, Dataverse provides scripts for fast iterative development without full container rebuilds.
+
+**Initial Setup**
+
+Run once per development session:
+
+.. code-block:: bash
+
+   ./scripts/dev/dev-start-frd.sh
+
+This command:
+
+- Builds the full Dataverse WAR with ``mvn package``
+- Extracts it into ``target/dataverse/`` as an exploded WAR
+- Configures JPA settings for development (``ddl-generation=none``)
+- Starts the dev stack with ``SKIP_DEPLOY=1``
+- Manually deploys the application via ``asadmin``
+
+**Iterative Development**
+
+After making code changes, run:
+
+.. code-block:: bash
+
+   ./scripts/dev/dev-frd.sh
+
+This script:
+
+- Compiles Java sources incrementally (``mvn compile``, ~5-10s)
+- Syncs updated classes and webapp resources into the mounted exploded WAR
+- Forces Payara to redeploy the application without restarting containers
+- Key features:
+  - Skips full Maven rebuilds (only compiles changed Java files)
+  - Avoids container restarts (uses hot-redeployment)
+  - Completes in ~12 seconds vs. ~54s for traditional full rebuild workflow (4.5x faster)
+  - Preserves database state between deployments
+
+**Typical Workflow**
+
+.. code-block:: bash
+
+   # Start dev environment once
+   ./scripts/dev/dev-start-frd.sh
+
+   # Edit Java or XHTML files...
+
+   # Fast redeploy
+   ./scripts/dev/dev-frd.sh
+
+   # Repeat as needed
+
+   # When finished, stop containers
+   ./scripts/dev/dev-down-frd.sh
+
+**Memory Configuration**
+
+The fast-redeploy workflow includes ``docker-compose.override.yml`` that increases the memory limit to 8GB 
+(from the default 2GB limit set for GitHub Actions CI) which is insufficient for local Dataverse development. 
+The override file is automatically used by the scripts.
+
+**Limitations**
+
+- Does not update dependencies (run full ``mvn package`` + restart if ``pom.xml`` changes)
+- Static resources (CSS, JS) may require browser cache clear
+- For database schema changes, use ``dev-rebuild.sh`` instead
+- Performance timings may vary depending on your hardware configuration
+
+**Note**: This workflow complements IDE-based redeployment. Use whichever fits your development style.
+
 Exploring the Database
 ----------------------
 
@@ -423,4 +497,4 @@ as the endpoint. Here are links to the most common IDEs docs on remote debugging
 Building Your Own Base Image
 ----------------------------
 
-If you find yourself tasked with upgrading Payara, you will need to create your own base image before running the :ref:`container-dev-quickstart`. For instructions, see :doc:`base-image`.
+If you find yourself tasked with upgrading Payara (or reviewing or testing such an upgrade), you will need to create your own base image before running the :ref:`container-dev-quickstart`. For instructions, see :ref:`base-image-build-instructions` under :doc:`base-image`.

@@ -77,7 +77,7 @@ Benefits: S3 offers several advantages over file storage:
 
 Challenges:
 
-- One additional step that is required to enable direct uploads via a Dataverse installation and for direct download to work with previewers and direct upload to work with DVWebloader (:ref:`folder-upload`) is to allow cross site (CORS) requests on your S3 store.
+- One additional step that is required to enable direct uploads via a Dataverse installation and for direct download to work with previewers and direct upload to work with DVWebloader (:ref:`folder-upload`) is to allow :ref:`cross site (CORS) requests on your S3 store <cors-s3-bucket>`.
 - Cost: S3 offers a pricing model that allows you to pay for the storage and transfer of data based on current usage (versus long term demand) but commercial 
   providers charge more per TB than the equivalent cost of a local disk (though commercial S3 storage is cheaper than commercial file storage).
   There can also be egress and other charges. Overall, S3 storage is generally more expensive than local file storage but cheaper than cloud file storage.
@@ -302,6 +302,7 @@ There are a broad range of options (that are not turned on by default) for impro
 - :ref:`:DisableSolrFacetsWithoutJsession` - disables facets for users who have disabled cookies (e.g. for bots)
 - :ref:`:DisableUncheckedTypesFacet` - only disables the facet showing the number of collections, datasets, files matching the query (this facet is potentially less useful than others)
 - :ref:`:StoreIngestedTabularFilesWithVarHeaders` - by default, Dataverse stores ingested files without headers and dynamically adds them back at download time. Once this setting is enabled, Dataverse will leave the headers in place (for newly ingested files), reducing the cost of downloads
+- :ref:`dataverse.bagit.zip.max-file-size`, :ref:`dataverse.bagit.zip.max-data-size`, and :ref:`dataverse.bagit.zip.holey` - options to control the size and temporary storage requirements when generating archival Bags - see :ref:`BagIt Export`
 
 
 Scaling Infrastructure

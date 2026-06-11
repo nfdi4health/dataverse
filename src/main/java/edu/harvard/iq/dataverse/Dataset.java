@@ -384,21 +384,7 @@ public class Dataset extends DvObjectContainer {
             in a pre-save validation SEK 12/6/2021
             */
             for (FileMetadata fm : latestVersion.getFileMetadatas()) {
-                FileMetadata newFm = new FileMetadata();
-                // TODO: 
-                // the "category" will be removed, shortly. 
-                // (replaced by multiple, tag-like categories of 
-                // type DataFileCategory) -- L.A. beta 10
-                //newFm.setCategory(fm.getCategory());
-                // yep, these are the new categories:
-                newFm.setCategories(fm.getCategories());
-                newFm.setDescription(fm.getDescription());
-                newFm.setLabel(fm.getLabel());
-                newFm.setDirectoryLabel(fm.getDirectoryLabel());
-                newFm.setRestricted(fm.isRestricted());
-                newFm.setDataFile(fm.getDataFile());
-                newFm.setDatasetVersion(dsv);
-                newFm.setProvFreeForm(fm.getProvFreeForm());
+                FileMetadata newFm = fm.createCopyInVersion(dsv);
                 newFm.setInPriorVersion(true);
 
                 //fmVarMet would be updated in DCT
@@ -410,8 +396,6 @@ public class Dataset extends DvObjectContainer {
                         newFm.copyVarGroups(fm.getVarGroups());
                     }
                 }
-                
-                dsv.getFileMetadatas().add(newFm);
             }
             
             if (latestVersion.getTermsOfUseAndAccess()!= null){
@@ -507,6 +491,26 @@ public class Dataset extends DvObjectContainer {
         for (DatasetVersion version : this.getVersions()) {
             if (version.isReleased()) {
                 return version;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the second-most-recent released version of this dataset.
+     * Assumes versions are ordered from most recent to oldest.
+     * 
+     * @return The prior released version, or null if there is only one or no released versions
+     */
+    public DatasetVersion getPriorReleasedVersion() {
+        boolean foundReleasedVersion = false;
+        for (DatasetVersion version : this.getVersions()) {
+            if (version.isReleased()) {
+                if(foundReleasedVersion) {
+                    return version;
+                } else {
+                    foundReleasedVersion = true;
+                }
             }
         }
         return null;
@@ -658,6 +662,10 @@ public class Dataset extends DvObjectContainer {
         return retVal;         
     }
 
+    public String getGlobalIdForFileStorageAsString() {
+        return getProtocolForFileStorage() + ":" + getAuthorityForFileStorage() + "/" + getIdentifierForFileStorage();
+    }
+
     public String getNextMajorVersionString() {
         // Never need to get the next major version for harvested studies.
         if (isHarvested()) {
@@ -753,6 +761,10 @@ public class Dataset extends DvObjectContainer {
 
     public void setThumbnailFile(DataFile thumbnailFile) {
         this.thumbnailFile = thumbnailFile;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailFile != null ? SystemConfig.getDataverseSiteUrlStatic() + "/api/datasets/" + this.getId() + "/logo" : null;
     }
 
     public boolean isUseGenericThumbnail() {
