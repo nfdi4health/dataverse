@@ -43,6 +43,14 @@ import java.util.logging.Logger;
  * [notes]    → labels + table info (→ DDI <notes>) TODO write all data that is not catched in notes
  *
  * Categories are linked via table::variable key.
+ *
+ * MVP / TEMPORARY LIMITATIONS:
+ * - ingestMetadata uses a JSON string, not a normalized DB model
+ * - semantic lookup happens at ingest time with no refresh strategy
+ * - only Mlstr_area::* fields are looked up; Mlstr_additional fields are stored as-is
+ * - only the first lookup result is used
+ * - lookup failures are silently swallowed and the raw OPAL value is kept
+ * - the MAELSTROM ontology identifier is hardcoded; multi-ontology routing is not implemented
  */
 public class OpalXlsxFileReader extends TabularDataFileReader {
 

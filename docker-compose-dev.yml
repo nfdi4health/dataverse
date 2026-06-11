@@ -8,6 +8,9 @@ services:
     image: ${APP_IMAGE}
     restart: on-failure
     user: payara
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DATAVERSE_DB_HOST: postgres
       DATAVERSE_DB_PASSWORD: secret

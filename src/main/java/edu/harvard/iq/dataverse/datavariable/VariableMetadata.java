@@ -22,6 +22,16 @@ import edu.harvard.iq.dataverse.FileMetadata;
 import jakarta.json.Json;
 import jakarta.json.JsonArrayBuilder;
 import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonReader;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 @Entity
 @Table(indexes = {@Index(columnList="datavariable_id"), @Index(columnList="filemetadata_id"),
@@ -127,57 +137,71 @@ public class VariableMetadata implements Serializable  {
         this.fileMetadata = fileMetadata;
         categoriesMetadata = new ArrayList<CategoryMetadata>() ;
         if (dataVariable != null && dataVariable.getIngestMetadata() != null) {
-            populateFromOpalMetadata(dataVariable.getIngestMetadata());
+            populateFromIngestMetadata(dataVariable.getIngestMetadata());
         }
     }
     private static String resolveConceptIri(String vocab, String content) {
-        String key = vocab + "=" + content;
+        if (vocab == null || content == null || !vocab.startsWith("Mlstr_area::")) {
+            return "";
+        }
 
-        return switch (key) {
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Age" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000002";
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Sex" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000003";
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Education" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000007";
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Residence" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000008";
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Family_hh_struct" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000006";
-            case "Mlstr_area::Sociodemographic_economic_characteristics=Labour_retirement" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000013";
+        String normalizedValue = normalizeValue(content);
+        try {
+            String encodedValue = URLEncoder.encode(normalizedValue, StandardCharsets.UTF_8);
+            String url = "https://semanticlookup.zbmed.de/ols/api/search?q=" + encodedValue
+                    + "&ontology=MAELSTROM&rows=1&exact=false";
 
-            case "Mlstr_area::Diseases=Other_dis",
-                 "Mlstr_area::Diseases=Respiratory_sys_dis" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000044";
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
 
-            case "Mlstr_area::Physical_environment=Neighborhood" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_00000000141";
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
 
-            case "Mlstr_area::Non_pharmacological_interventions=Educational_inter" ->
-                    "http://semanticlookup.zbmed.de/km/MAELSTROM/ZBMED_MS_0000000084";
+            HttpResponse<String> response = client
+                    .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .get(10, java.util.concurrent.TimeUnit.SECONDS);
 
-            case "Mlstr_area::Symptoms_signs=General_sympt" ->
-                    "https://icd.who.int/browse10/2019/en#/R50-R69";
-            case "Mlstr_area::Symptoms_signs=Digestive_sympt" ->
-                    "https://icd.who.int/browse10/2019/en#/R10-R19";
-            case "Mlstr_area::Symptoms_signs=Nervous_musculoskeletal_sympt" ->
-                    "https://icd.who.int/browse10/2019/en#/R25-R29";
-            case "Mlstr_area::Symptoms_signs=Circulatory_respiratory_sympt" ->
-                    "https://icd.who.int/browse10/2019/en#/R00-R09";
-
-            default -> "";
-        };
+            if (response.statusCode() == 200) {
+                try (JsonReader reader = Json.createReader(new StringReader(response.body()))) {
+                    JsonObject obj = reader.readObject();
+                    if (obj.containsKey("response")) {
+                        JsonObject resp = obj.getJsonObject("response");
+                        if (resp.containsKey("docs")) {
+                            JsonArray docs = resp.getJsonArray("docs");
+                            if (!docs.isEmpty()) {
+                                return docs.getJsonObject(0).getString("iri", "");
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Temporary debug logging - remove before merge
+            java.util.logging.Logger.getLogger(VariableMetadata.class.getName())
+                    .warning("Semantic lookup failed for vocab=" + vocab
+                            + " content=" + content + ": " + e.getClass().getName()
+                            + ": " + e.getMessage());
+        }
+        return "";
     }
 
-    private void populateFromOpalMetadata(String opalMetadata) {
-        if (opalMetadata == null || opalMetadata.isEmpty()) {
+    static String normalizeValue(String value) {
+        return value == null ? "" : value.replace("_", " ");
+    }
+
+    private void populateFromIngestMetadata(String ingestMetadata) {
+        if (ingestMetadata == null || ingestMetadata.isEmpty()) {
             return;
         }
 
-        String universeSection = extractSection(opalMetadata, "[universe]");
-        String conceptsSection = extractSection(opalMetadata, "[concepts]");
-        String notesSection    = extractSection(opalMetadata, "[notes]");
+        String universeSection = extractSection(ingestMetadata, "[universe]");
+        String conceptsSection = extractSection(ingestMetadata, "[concepts]");
+        String notesSection    = extractSection(ingestMetadata, "[notes]");
 
         // [universe] → this.universe
         if (!universeSection.isBlank()) {
