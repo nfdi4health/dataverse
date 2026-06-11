@@ -19,6 +19,19 @@ import java.util.Collection;
 import java.util.ArrayList;
 
 import edu.harvard.iq.dataverse.FileMetadata;
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonReader;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 @Entity
 @Table(indexes = {@Index(columnList="datavariable_id"), @Index(columnList="filemetadata_id"),
@@ -81,6 +94,18 @@ public class VariableMetadata implements Serializable  {
     private String notes;
 
     /**
+     * concepts: concepts, metadata variable field (JSON).
+     */
+    @Column(columnDefinition="TEXT")
+    private String concepts;
+
+    /**
+     * metadata: additional metadata, metadata variable field (JSON).
+     */
+    @Column(columnDefinition="TEXT")
+    private String metadata;
+
+    /**
      * isweightvar: It defines if variable is a weight variable
      */
     private boolean isweightvar = false;
@@ -99,6 +124,8 @@ public class VariableMetadata implements Serializable  {
     /**
      * dataVariable: DataVariable with which this variable is weighted.
      */
+    @ManyToOne
+    @JoinColumn(nullable=true)
     private DataVariable weightvariable;
 
     public VariableMetadata () {
@@ -109,6 +136,123 @@ public class VariableMetadata implements Serializable  {
         this.dataVariable = dataVariable;
         this.fileMetadata = fileMetadata;
         categoriesMetadata = new ArrayList<CategoryMetadata>() ;
+        if (dataVariable != null && dataVariable.getIngestMetadata() != null) {
+            populateFromIngestMetadata(dataVariable.getIngestMetadata());
+        }
+    }
+    private static String resolveConceptIri(String vocab, String content) {
+        if (vocab == null || content == null || !vocab.startsWith("Mlstr_area::")) {
+            return "";
+        }
+
+        String normalizedValue = normalizeValue(content);
+        try {
+            String encodedValue = URLEncoder.encode(normalizedValue, StandardCharsets.UTF_8);
+            String url = "https://semanticlookup.zbmed.de/ols/api/search?q=" + encodedValue
+                    + "&ontology=MAELSTROM&rows=1&exact=false";
+
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client
+                    .sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+            if (response.statusCode() == 200) {
+                try (JsonReader reader = Json.createReader(new StringReader(response.body()))) {
+                    JsonObject obj = reader.readObject();
+                    if (obj.containsKey("response")) {
+                        JsonObject resp = obj.getJsonObject("response");
+                        if (resp.containsKey("docs")) {
+                            JsonArray docs = resp.getJsonArray("docs");
+                            if (!docs.isEmpty()) {
+                                return docs.getJsonObject(0).getString("iri", "");
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Temporary debug logging - remove before merge
+            java.util.logging.Logger.getLogger(VariableMetadata.class.getName())
+                    .warning("Semantic lookup failed for vocab=" + vocab
+                            + " content=" + content + ": " + e.getClass().getName()
+                            + ": " + e.getMessage());
+        }
+        return "";
+    }
+
+    static String normalizeValue(String value) {
+        return value == null ? "" : value.replace("_", " ");
+    }
+
+    private void populateFromIngestMetadata(String ingestMetadata) {
+        if (ingestMetadata == null || ingestMetadata.isEmpty()) {
+            return;
+        }
+
+        String universeSection = extractSection(ingestMetadata, "[universe]");
+        String conceptsSection = extractSection(ingestMetadata, "[concepts]");
+        String notesSection    = extractSection(ingestMetadata, "[notes]");
+
+        // [universe] → this.universe
+        if (!universeSection.isBlank()) {
+            for (String line : universeSection.split("\n")) {
+                int eq = line.indexOf('=');
+                if (eq > 0 && line.substring(0, eq).trim().equals("entityType")) {
+                    this.universe = line.substring(eq + 1).trim();
+                }
+            }
+        }
+
+        // [concepts] → this.concepts als JSON-Array
+        if (!conceptsSection.isBlank()) {
+            JsonArrayBuilder conceptBuilder = Json.createArrayBuilder();
+            for (String line : conceptsSection.split("\n")) {
+                int eq = line.indexOf('=');
+                if (eq > 0) {
+                    String key   = line.substring(0, eq).trim();
+                    String value = line.substring(eq + 1).trim();
+                    String vocabURI = resolveConceptIri(key, value);
+
+                    conceptBuilder.add(Json.createObjectBuilder()
+                            .add("vocab", key)
+                            .add("vocabURI", vocabURI)
+                            .add("content", value)
+                            .build());
+                }
+            }
+            JsonArray arr = conceptBuilder.build();
+            if (!arr.isEmpty()) {
+                this.concepts = arr.toString();
+            }
+        }
+
+        // [notes] → this.metadata (labels + table)
+        if (!notesSection.isBlank()) {
+            this.metadata = notesSection.trim();
+        }
+    }
+
+    private static String extractSection(String raw, String sectionHeader) {
+        int start = raw.indexOf(sectionHeader);
+        if (start < 0) return "";
+        start += sectionHeader.length();
+        int end = raw.length();
+        for (String other : new String[]{"[universe]", "[concepts]", "[notes]"}) {
+            if (other.equals(sectionHeader)) continue;
+            int pos = raw.indexOf(other, start);
+            if (pos >= 0 && pos < end) end = pos;
+        }
+        return raw.substring(start, end).trim();
     }
 
     /**
@@ -171,6 +315,22 @@ public class VariableMetadata implements Serializable  {
     }
 
     public String getNotes() { return notes; }
+
+    public String getConcepts() {
+        return concepts;
+    }
+
+    public void setConcepts(String concepts) {
+        this.concepts = concepts;
+    }
+
+    public String getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(String metadata) {
+        this.metadata = metadata;
+    }
 
     public String getUniverse() { return this.universe; }
 

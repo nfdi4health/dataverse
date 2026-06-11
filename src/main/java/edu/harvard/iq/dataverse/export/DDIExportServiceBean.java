@@ -44,6 +44,11 @@ import jakarta.persistence.PersistenceContext;
 import javax.xml.stream.XMLStreamWriter;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLOutputFactory;
+import jakarta.json.Json;
+import jakarta.json.JsonArray;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonReader;
+import java.io.StringReader;
 
 /**
  *
@@ -342,6 +347,32 @@ public class DDIExportServiceBean {
                         xmlw.writeEndElement(); //ivuInstr
                     }
                     xmlw.writeEndElement(); //qstn
+                }
+            }
+        }
+
+        // concept
+        if (checkField("concept", excludedFieldSet, includedFieldSet)) {
+            if (vm != null && !StringUtilisEmpty(vm.getConcepts())) {
+                try (JsonReader reader = Json.createReader(new StringReader(vm.getConcepts()))) {
+                    JsonArray concepts = reader.readArray();
+
+                    for (JsonObject concept : concepts.getValuesAs(JsonObject.class)) {
+                        String vocab = concept.getString("vocab", null);
+                        String vocabURI = concept.getString("vocabURI", null);
+                        String content = concept.getString("content", null);
+
+                        if (StringUtilisEmpty(content)) {
+                            continue;
+                        }
+
+                        xmlw.writeStartElement("concept");
+                        writeAttribute(xmlw, "vocab", vocab);
+                        writeAttribute(xmlw, "vocabURI", vocabURI);
+                        writeAttribute(xmlw, "source", "archive");
+                        xmlw.writeCharacters(content);
+                        xmlw.writeEndElement();
+                    }
                 }
             }
         }

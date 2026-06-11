@@ -128,6 +128,7 @@ public class FileUtil implements java.io.Serializable  {
     public static final String MIME_TYPE_TSV     = "text/tsv";
     public static final String MIME_TYPE_TSV_ALT = "text/tab-separated-values";
     public static final String MIME_TYPE_XLSX    = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    public static final String MIME_TYPE_OPAL_XLSX = "application/x-opal+xlsx";
     
     public static final String MIME_TYPE_SPSS_SAV = "application/x-spss-sav";
     public static final String MIME_TYPE_SPSS_POR = "application/x-spss-por";
@@ -824,7 +825,13 @@ public class FileUtil implements java.io.Serializable  {
     }
 
 	public static boolean useRecognizedType(String suppliedContentType, String recognizedType) {
-		// is it any better than the type that was supplied to us,
+                if (suppliedContentType != null && recognizedType != null
+                        && suppliedContentType.equalsIgnoreCase(MIME_TYPE_OPAL_XLSX)
+                        && recognizedType.equalsIgnoreCase(MIME_TYPE_XLSX)) {
+                    // Preserve explicit OPAL uploads instead of downgrading to generic XLSX.
+                    return false;
+                }
+			// is it any better than the type that was supplied to us,
 		// if any?
 		// This is not as trivial a task as one might expect...
 		// We may need a list of "good" mime types, that should always
@@ -846,13 +853,14 @@ public class FileUtil implements java.io.Serializable  {
 		if (suppliedContentType == null || suppliedContentType.equals("")
 				|| suppliedContentType.equalsIgnoreCase(MIME_TYPE_UNDETERMINED_DEFAULT)
 				|| suppliedContentType.equalsIgnoreCase(MIME_TYPE_UNDETERMINED_BINARY)
-				|| (canIngestAsTabular(suppliedContentType) 
-						&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_CSV)
-						&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_CSV_ALT)
-						&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_XLSX))
-				|| canIngestAsTabular(recognizedType) || recognizedType.equals("application/fits-gzipped")
-				|| recognizedType.equalsIgnoreCase(ShapefileHandler.SHAPEFILE_FILE_TYPE)
-				|| recognizedType.equalsIgnoreCase(BagItFileHandler.FILE_TYPE)
+						|| (canIngestAsTabular(suppliedContentType) 
+							&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_CSV)
+							&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_CSV_ALT)
+							&& !suppliedContentType.equalsIgnoreCase(MIME_TYPE_XLSX)
+                            && !suppliedContentType.equalsIgnoreCase(MIME_TYPE_OPAL_XLSX))
+					|| canIngestAsTabular(recognizedType) || recognizedType.equals("application/fits-gzipped")
+					|| recognizedType.equalsIgnoreCase(ShapefileHandler.SHAPEFILE_FILE_TYPE)
+					|| recognizedType.equalsIgnoreCase(BagItFileHandler.FILE_TYPE)
 				|| recognizedType.equals(MIME_TYPE_ZIP)
                 || recognizedType.equals(MIME_TYPE_RO_CRATE)) {
 			return true;
@@ -1027,6 +1035,7 @@ public class FileUtil implements java.io.Serializable  {
             case MIME_TYPE_TSV:
             //case MIME_TYPE_TSV_ALT:
             case MIME_TYPE_XLSX:
+            case MIME_TYPE_OPAL_XLSX:
             case MIME_TYPE_SPSS_SAV:
             case MIME_TYPE_SPSS_POR:
                 return true;
