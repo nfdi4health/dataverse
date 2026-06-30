@@ -124,7 +124,18 @@ public class CuratePublishedDatasetVersionCommand extends AbstractDatasetCommand
         
         // Look for file metadata changes and update published metadata if needed
         List<FileMetadata> pubFmds = updateVersion.getFileMetadatas();
-
+        int pubFileCount = pubFmds.size();
+        int newFileCount = tempDataset.getOrCreateEditVersion().getFileMetadatas().size();
+        /*
+         * The policy for this command is that it should only be used when the change is
+         * a 'minor update' with no file changes. Nominally we could call
+         * .isMinorUpdate() for that but we're making the same checks as we go through
+         * the update here.
+         */
+        if (pubFileCount != newFileCount) {
+            logger.severe("Draft version of dataset: " + tempDataset.getId() + " has: " + newFileCount + " while last published version has " + pubFileCount);
+            throw new IllegalCommandException(BundleUtil.getStringFromBundle("datasetversion.update.failure"), this);
+        }
         Long thumbId = null;
         if(tempDataset.getThumbnailFile()!=null) {
             thumbId = tempDataset.getThumbnailFile().getId();
