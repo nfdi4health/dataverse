@@ -147,10 +147,13 @@ collection and file results are required.
 Dataverse does not populate the Meilisearch index. An external process must keep
 it synchronized. Every document must expose a displayed string attribute named
 ``dsPersistentId`` containing the same dataset persistent identifier stored in
-Solr. Use a separate integer or Meilisearch-compatible string as the primary
-key because
-Dataverse persistent identifiers contain characters that Meilisearch primary
-keys do not accept. For example:
+Solr. If the index restricts ``displayedAttributes``, that list must include
+``dsPersistentId``; otherwise Meilisearch omits the identifier from search hits
+and Dataverse cannot hydrate them from Solr. An attribute with another name,
+such as ``pid``, does not satisfy this contract. Use a separate integer or
+Meilisearch-compatible string as the primary key because Dataverse persistent
+identifiers contain characters that Meilisearch primary keys do not accept. For
+example:
 
 .. code-block:: json
 
