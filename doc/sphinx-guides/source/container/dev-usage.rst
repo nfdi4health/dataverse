@@ -468,6 +468,33 @@ The fast-redeploy workflow includes ``docker-compose.override.yml`` that increas
 (from the default 2GB limit set for GitHub Actions CI) which is insufficient for local Dataverse development. 
 The override file is automatically used by the scripts.
 
+**Meilisearch**
+
+To start the fast-redeploy environment with the optional Meilisearch service
+and use it for UI searches, run:
+
+.. code-block:: bash
+
+   DATAVERSE_SEARCH_DEFAULT_SERVICE=meilisearch \
+   DATAVERSE_COMPOSE_OVERLAY=docker-compose.meilisearch.yml \
+   STORAGE_DIR=/dv \
+   ./scripts/dev/dev-start-frd.sh
+
+Omit ``DATAVERSE_SEARCH_DEFAULT_SERVICE`` to keep Solr as the default and
+select Meilisearch per Search API request with
+``search_service=meilisearch``. The Meilisearch index must be populated by an
+external process. See :doc:`/developers/search-services` for the index contract
+and :doc:`/installation/config` for connection and hybrid-search settings.
+
+Stop the environment with the same Compose overlay:
+
+.. code-block:: bash
+
+   STORAGE_DIR=/dv docker compose \
+     -f docker-compose-dev.yml \
+     -f docker-compose.meilisearch.yml \
+     down
+
 **Limitations**
 
 - Does not update dependencies (run full ``mvn package`` + restart if ``pom.xml`` changes)

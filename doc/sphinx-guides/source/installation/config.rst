@@ -3811,6 +3811,79 @@ dataverse.search.default-service
 
 Experimental. See :doc:`/developers/search-services`.
 
+dataverse.search.meilisearch.url
+++++++++++++++++++++++++++++++++
+
+Base URL of the Meilisearch server used by the built-in ``meilisearch`` search
+service, for example ``http://meilisearch:7700``. This setting is required when
+that service handles a query.
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_URL``.
+
+dataverse.search.meilisearch.api-key
+++++++++++++++++++++++++++++++++++++
+
+Optional Meilisearch API key. Use a key restricted to the ``search`` action and
+the configured index rather than a master or admin key. Protect this value with
+one of the mechanisms described in :ref:`secure-password-storage`.
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_API_KEY``.
+
+dataverse.search.meilisearch.index
+++++++++++++++++++++++++++++++++++
+
+Meilisearch index containing dataset documents. Each document must expose a
+displayed ``dsPersistentId`` attribute containing its Dataverse persistent
+identifier.
+
+Default: ``datasets``
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_INDEX``.
+
+dataverse.search.meilisearch.candidate-limit
+++++++++++++++++++++++++++++++++++++++++++++
+
+Maximum number of ranked Meilisearch dataset candidates passed to Solr for
+permission filtering and response hydration. Totals and facets returned by this
+search service are limited to accessible documents within this candidate set.
+The value must also be allowed by the Meilisearch index's
+``pagination.maxTotalHits`` setting. The maximum supported value is ``1000`` so
+the generated Solr PID query remains below the standard boolean clause limit.
+
+Default: ``1000``
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_CANDIDATE_LIMIT``.
+
+dataverse.search.meilisearch.embedder
++++++++++++++++++++++++++++++++++++++
+
+Optional name of a Meilisearch embedder configured on the selected index. When
+set, the service uses hybrid keyword and semantic ranking for non-empty
+queries. The external process that populates the index is responsible for
+creating and maintaining the embedder. Placeholder searches remain
+keyword-only.
+
+Default: *not configured*
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER``.
+
+dataverse.search.meilisearch.semantic-ratio
++++++++++++++++++++++++++++++++++++++++++++
+
+Balance between keyword and semantic ranking when
+``dataverse.search.meilisearch.embedder`` is configured. Values must be between
+``0.0`` (keyword only) and ``1.0`` (semantic only), inclusive.
+
+Default: ``0.5``
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_SEMANTIC_RATIO``.
+
 .. _dataverse.cors.origin:
 
 dataverse.cors.origin

@@ -1,0 +1,33 @@
+services:
+  dev_dataverse:
+    environment:
+      DATAVERSE_SEARCH_DEFAULT_SERVICE: "${DATAVERSE_SEARCH_DEFAULT_SERVICE:-solr}"
+      DATAVERSE_SEARCH_MEILISEARCH_URL: http://dev_meilisearch:7700
+      DATAVERSE_SEARCH_MEILISEARCH_API_KEY: dataverse-test-master-key
+      DATAVERSE_SEARCH_MEILISEARCH_INDEX: zbdocs
+      DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER: "${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER:-}"
+      DATAVERSE_SEARCH_MEILISEARCH_SEMANTIC_RATIO: "${DATAVERSE_SEARCH_MEILISEARCH_SEMANTIC_RATIO:-0.5}"
+    depends_on:
+      dev_meilisearch:
+        condition: service_healthy
+
+  dev_meilisearch:
+    image: getmeili/meilisearch:v1.53.1
+    environment:
+      MEILI_MASTER_KEY: dataverse-test-master-key
+      MEILI_EXPERIMENTAL_ALLOWED_IP_NETWORKS:
+    ports:
+      - "127.0.0.1:${MEILISEARCH_PORT:-17700}:7700"
+    networks:
+      - dataverse
+    volumes:
+      - dev_meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  dev_meilisearch_data:

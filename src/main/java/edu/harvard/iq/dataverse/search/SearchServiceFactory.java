@@ -46,9 +46,12 @@ public class SearchServiceFactory {
         for (Bean<?> bean : beans) {
             SearchService service = (SearchService) beanManager.getReference(bean, SearchService.class,
                     beanManager.createCreationalContext(bean));
-            if (INTERNAL_SOLR_SERVICE_NAME.equals(service.getServiceName())) {
+            boolean isSolr = INTERNAL_SOLR_SERVICE_NAME.equals(service.getServiceName());
+            if (isSolr || MeilisearchSearchServiceBean.SERVICE_NAME.equals(service.getServiceName())) {
                 //May be a proxy and not a SolrSearchServiceBean at this point
-                solrSearchService = service;
+                if (isSolr) {
+                    solrSearchService = service;
+                }
                 serviceMap.put(service.getServiceName(), service);
                 logger.log(Level.INFO, "Loaded built-in search service: {0}", service.getServiceName());
             } else {
