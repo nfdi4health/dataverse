@@ -482,9 +482,24 @@ and use it for UI searches, run:
 
 Omit ``DATAVERSE_SEARCH_DEFAULT_SERVICE`` to keep Solr as the default and
 select Meilisearch per Search API request with
-``search_service=meilisearch``. The Meilisearch index must be populated by an
-external process. See :doc:`/developers/search-services` for the index contract
-and :doc:`/installation/config` for connection and hybrid-search settings.
+``search_service=meilisearch``. The Compose overlay creates the configured
+index and applies its required settings when Meilisearch starts with an empty
+volume. Documents must still be populated by an external process. See
+:doc:`/developers/search-services` for the index contract and
+:doc:`/installation/config` for connection and hybrid-search settings.
+
+To have the initializer configure an Ollama embedder for hybrid search, also
+set the embedder name used by Dataverse and its Meilisearch settings:
+
+.. code-block:: bash
+
+   DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER=ollama \
+   MEILISEARCH_EMBEDDER_URL=http://ollama.example.org:11434/api/embed \
+   MEILISEARCH_EMBEDDER_MODEL=embedding-model \
+   MEILISEARCH_EMBEDDER_DIMENSIONS=768 \
+   DATAVERSE_COMPOSE_OVERLAY=docker-compose.meilisearch.yml \
+   STORAGE_DIR=/dv \
+   ./scripts/dev/dev-start-frd.sh
 
 Stop the environment with the same Compose overlay:
 
