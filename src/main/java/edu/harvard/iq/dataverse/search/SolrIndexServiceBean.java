@@ -70,6 +70,8 @@ public class SolrIndexServiceBean {
     DataverseRoleServiceBean rolesSvc;
     @EJB
     SolrClientIndexService solrClientService;
+    @EJB
+    SearchIndexCoordinator searchIndexCoordinator;
     
     @PersistenceContext(unitName = "VDCNet-ejbPU")
     private EntityManager em;
@@ -556,24 +558,17 @@ public class SolrIndexServiceBean {
         if (solrIdsToDelete.isEmpty()) {
             return new IndexResponse("nothing to delete");
         }
-        try {
-            solrClientService.getSolrClient().deleteById(solrIdsToDelete);
-        } catch (SolrServerException | IOException ex) {
-            /**
-             * @todo mark these for re-deletion
-             */
-            return new IndexResponse("problem deleting the following documents from Solr: " + solrIdsToDelete);
-        }
-        return new IndexResponse("no known problem deleting the following documents from Solr:" + solrIdsToDelete);
+        searchIndexCoordinator.delete(solrIdsToDelete);
+        return new IndexResponse("queued deletion of the following search index documents: " + solrIdsToDelete);
     }
 
     public JsonObjectBuilder deleteAllFromSolrAndResetIndexTimes() throws SolrServerException, IOException {
         JsonObjectBuilder response = Json.createObjectBuilder();
-        logger.fine("attempting to delete all Solr documents before a complete re-index");
-        solrClientService.getSolrClient().deleteByQuery("*:*");
+        logger.fine("attempting to delete all search index documents before a complete re-index");
+        searchIndexCoordinator.deleteAll();
         int numRowsAffected = dvObjectService.clearAllIndexTimes();
         response.add(numRowsClearedByClearAllIndexTimes, numRowsAffected);
-        response.add(messageString, "Solr index and database index timestamps cleared.");
+        response.add(messageString, "Search indexes queued for clearing and database index timestamps cleared.");
         return response;
     }
 

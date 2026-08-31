@@ -30,6 +30,7 @@ class MeilisearchSearchServiceBeanTest {
         assertEquals("", request.getString("q"));
         assertEquals(0, request.getInt("offset"));
         assertEquals(25, request.getInt("limit"));
+        assertEquals("dvObjectType = datasets", request.getString("filter"));
         assertEquals("dsPersistentId", request.getJsonArray("attributesToRetrieve").getString(0));
         assertTrue(request.getBoolean("showRankingScore"));
         assertFalse(request.containsKey("hybrid"));

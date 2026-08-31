@@ -3815,8 +3815,8 @@ dataverse.search.meilisearch.url
 ++++++++++++++++++++++++++++++++
 
 Base URL of the Meilisearch server used by the built-in ``meilisearch`` search
-service, for example ``http://meilisearch:7700``. This setting is required when
-that service handles a query.
+service, for example ``http://meilisearch:7700``. When configured, Dataverse
+also mirrors non-permission search index documents to Meilisearch.
 
 Can also be set via *MicroProfile Config API* sources, for example the
 environment variable ``DATAVERSE_SEARCH_MEILISEARCH_URL``.
@@ -3831,12 +3831,25 @@ one of the mechanisms described in :ref:`secure-password-storage`.
 Can also be set via *MicroProfile Config API* sources, for example the
 environment variable ``DATAVERSE_SEARCH_MEILISEARCH_API_KEY``.
 
+dataverse.search.meilisearch.index-api-key
+++++++++++++++++++++++++++++++++++++++++++
+
+Optional Meilisearch API key used for document replacement, deletion, and task
+status requests. Restrict this key to the configured index and the
+``documents.add``, ``documents.delete``, and ``tasks.get`` actions. If omitted,
+Dataverse uses ``dataverse.search.meilisearch.api-key`` for indexing as well.
+Protect this value with one of the mechanisms described in
+:ref:`secure-password-storage`.
+
+Can also be set via *MicroProfile Config API* sources, for example the
+environment variable ``DATAVERSE_SEARCH_MEILISEARCH_INDEX_API_KEY``.
+
 dataverse.search.meilisearch.index
 ++++++++++++++++++++++++++++++++++
 
-Meilisearch index containing dataset documents. Each document must expose a
-displayed ``dsPersistentId`` attribute containing its Dataverse persistent
-identifier.
+Meilisearch index containing the non-permission documents mirrored from Solr.
+Dataset documents expose a ``dsPersistentId`` attribute containing their
+Dataverse persistent identifier.
 
 Default: ``datasets``
 
@@ -3863,9 +3876,8 @@ dataverse.search.meilisearch.embedder
 
 Optional name of a Meilisearch embedder configured on the selected index. When
 set, the service uses hybrid keyword and semantic ranking for non-empty
-queries. The external process that populates the index is responsible for
-creating and maintaining the embedder. Placeholder searches remain
-keyword-only.
+queries. The installation is responsible for creating and maintaining the
+embedder. Placeholder searches remain keyword-only.
 
 Default: *not configured*
 

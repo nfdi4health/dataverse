@@ -102,7 +102,6 @@ import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrQuery.SortClause;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
@@ -154,7 +153,7 @@ public class IndexServiceBean {
     @EJB
     SolrClientService solrClientService; // only for query index on Solr
     @EJB
-    SolrClientIndexService solrClientIndexService; // only for add, update, or remove index on Solr
+    SearchIndexCoordinator searchIndexCoordinator;
     @EJB
     DataFileServiceBean dataFileService;
 
@@ -330,17 +329,10 @@ public class IndexServiceBean {
 
         docs.add(solrInputDocument);
 
-        String status;
-        try {
-            if (dataverse.getId() != null) {
-                solrClientIndexService.getSolrClient().add(docs);
-            } else {
-                logger.info("WARNING: indexing of a dataverse with no id attempted");
-            }
-        } catch (SolrServerException | IOException ex) {
-            status = ex.toString();
-            logger.info(status);
-            return new AsyncResult<>(status);
+        if (dataverse.getId() != null) {
+            searchIndexCoordinator.upsertContent(docs);
+        } else {
+            logger.info("WARNING: indexing of a dataverse with no id attempted");
         }
         dvObjectService.updateContentIndexTime(dataverse);
         IndexResponse indexResponse = solrIndexService.indexPermissionsForOneDvObject(dataverse);
@@ -1859,16 +1851,7 @@ public class IndexServiceBean {
     private String addOrUpdateDataset(IndexableDataset indexableDataset, Set<Long> datafilesInDraftVersion) throws  SolrServerException, IOException {   
         final SolrInputDocuments docs = toSolrDocs(indexableDataset, datafilesInDraftVersion);
 
-        try {
-            solrClientIndexService.getSolrClient().add(docs.getDocuments());
-        } catch (SolrServerException | IOException ex) {
-            logger.warning("Check process-failures logs re: " + ex.getLocalizedMessage());
-            if (ex.getCause() instanceof SolrServerException) {
-                throw new SolrServerException(ex);
-            } else if (ex.getCause() instanceof IOException) {
-                throw new IOException(ex);
-            }
-        }
+        searchIndexCoordinator.upsertContent(docs.getDocuments());
         return docs.getMessage();
     }
 
@@ -2123,7 +2106,7 @@ public class IndexServiceBean {
 
             sid.removeField(SearchFields.SUBTREE);
             sid.addField(SearchFields.SUBTREE, paths);
-            solrClientIndexService.getSolrClient().add(sid);
+            searchIndexCoordinator.upsertContent(List.of(sid));
             if (object.isInstanceofDataset()) {
                 for (DataFile df : dataset.getFiles()) {
                     solrQuery.setQuery(SearchUtil.constructQuery(SearchFields.ENTITY_ID, df.getId().toString()));
@@ -2136,7 +2119,7 @@ public class IndexServiceBean {
                         }
                         sid.removeField(SearchFields.SUBTREE);
                         sid.addField(SearchFields.SUBTREE, paths);
-                        solrClientIndexService.getSolrClient().add(sid);
+                        searchIndexCoordinator.upsertContent(List.of(sid));
                     }
                 }
             }
@@ -2175,14 +2158,9 @@ public class IndexServiceBean {
     }
 
     public String delete(Dataverse doomed) {
-        logger.fine("deleting Solr document for dataverse " + doomed.getId());
-        UpdateResponse updateResponse;
-        try {
-            updateResponse = solrClientIndexService.getSolrClient().deleteById(solrDocIdentifierDataverse + doomed.getId());
-        } catch (SolrServerException | IOException ex) {
-            return ex.toString();
-        }
-        String response = "Successfully deleted dataverse " + doomed.getId() + " from Solr index. updateReponse was: " + updateResponse.toString();
+        logger.fine("deleting search index document for dataverse " + doomed.getId());
+        searchIndexCoordinator.delete(List.of(solrDocIdentifierDataverse + doomed.getId()));
+        String response = "Queued deletion of dataverse " + doomed.getId() + " from the search indexes.";
         logger.fine(response);
         return response;
     }
@@ -2195,14 +2173,9 @@ public class IndexServiceBean {
      */
     public String removeSolrDocFromIndex(String doomed) {
 
-        logger.fine("deleting Solr document: " + doomed);
-        UpdateResponse updateResponse;
-        try {
-            updateResponse = solrClientIndexService.getSolrClient().deleteById(doomed);
-        } catch (SolrServerException | IOException ex) {
-            return ex.toString();
-        }
-        String response = "Attempted to delete " + doomed + " from Solr index. updateReponse was: " + updateResponse.toString();
+        logger.fine("deleting search index document: " + doomed);
+        searchIndexCoordinator.delete(List.of(doomed));
+        String response = "Queued deletion of " + doomed + " from the search indexes.";
         logger.fine(response);
         return response;
     }

@@ -33,6 +33,8 @@ import edu.harvard.iq.dataverse.search.IndexUtil;
 import edu.harvard.iq.dataverse.search.SearchException;
 import edu.harvard.iq.dataverse.search.SearchFields;
 import edu.harvard.iq.dataverse.search.SearchFilesServiceBean;
+import edu.harvard.iq.dataverse.search.SearchIndexOperation;
+import edu.harvard.iq.dataverse.search.SearchIndexOperationServiceBean;
 import edu.harvard.iq.dataverse.search.SearchServiceFactory;
 import edu.harvard.iq.dataverse.search.SearchUtil;
 import edu.harvard.iq.dataverse.search.SolrIndexServiceBean;
@@ -44,6 +46,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -102,6 +105,8 @@ public class Index extends AbstractApiBean {
     DatasetFieldServiceBean datasetFieldService;
     @EJB
     SearchFilesServiceBean searchFilesService;
+    @EJB
+    SearchIndexOperationServiceBean searchIndexOperationService;
 
     public static String contentChanged = "contentChanged";
     public static String contentIndexed = "contentIndexed";
@@ -229,8 +234,8 @@ public class Index extends AbstractApiBean {
 
     @GET
     @Path("clear")
-    @Operation(summary = "Clears the Solr index",
-            description = "Clears all Solr documents and resets stored index timestamps.")
+    @Operation(summary = "Clears the search indexes",
+            description = "Queues deletion of all Solr and configured Meilisearch documents and resets stored index timestamps.")
     public Response clearSolrIndex() {
         try {
             JsonObjectBuilder response = SolrIndexService.deleteAllFromSolrAndResetIndexTimes();
@@ -361,28 +366,28 @@ public class Index extends AbstractApiBean {
     }
 
     /**
-     * Clears the entry for a dataset from Solr
+     * Clears the entry for a dataset from the search indexes.
      * 
      * @param id numer id of the dataset
      * @return response; 
      * will return 404 if no such dataset in the database; but will attempt to 
-     * clear the entry from Solr regardless.
+     * clear the entry from the search indexes regardless.
      */
     @DELETE
     @Path("datasets/{id}")
-    @Operation(summary = "Clears a dataset from the Solr index",
-            description = "Removes the Solr document for the specified dataset id, even when the dataset no longer exists in the database.")
+    @Operation(summary = "Clears a dataset from the search indexes",
+            description = "Removes the document for the specified dataset id, even when the dataset no longer exists in the database.")
     public Response clearDatasetFromIndex(
-            @Parameter(description = "Numeric id of the dataset to remove from Solr.", required = true)
+            @Parameter(description = "Numeric id of the dataset to remove from the search indexes.", required = true)
             @PathParam("id") Long id) {
         Dataset dataset = datasetService.find(id);
-        // We'll attempt to delete the Solr document regardless of whether the 
+        // We'll attempt to delete the search documents regardless of whether the
         // dataset exists in the database: 
         String response = indexService.removeSolrDocFromIndex(IndexServiceBean.solrDocIdentifierDataset + id);
         if (dataset != null) {
-            return ok("Sent request to clear Solr document for dataset " + id + ": " + response);
+            return ok("Sent request to clear search index documents for dataset " + id + ": " + response);
         } else {
-            return notFound("Could not find dataset " + id + " in the database. Requested to clear from Solr anyway: " + response);
+            return notFound("Could not find dataset " + id + " in the database. Requested to clear from the search indexes anyway: " + response);
         }
     }
 
@@ -450,6 +455,82 @@ public class Index extends AbstractApiBean {
             return wr.getResponse();
         }
     }
+
+    @GET
+    @AuthRequired
+    @Path("backends/status")
+    @Operation(summary = "Reports search index backend delivery status",
+            description = "Reports queued, retrying, and permanently failed operations for each search index backend.")
+    public Response indexBackendStatus(@Context ContainerRequestContext crc) {
+        try {
+            AuthenticatedUser user = getRequestAuthenticatedUserOrDie(crc);
+            if (!user.isSuperuser()) {
+                return error(Status.FORBIDDEN, "Superusers only.");
+            }
+
+            JsonObjectBuilder backends = Json.createObjectBuilder();
+            for (SearchIndexOperation.Backend backend : SearchIndexOperation.Backend.values()) {
+                Map<SearchIndexOperation.State, Long> status = searchIndexOperationService.getStatus(backend);
+                JsonObjectBuilder states = Json.createObjectBuilder();
+                long queued = 0;
+                for (SearchIndexOperation.State state : SearchIndexOperation.State.values()) {
+                    long count = status.getOrDefault(state, 0L);
+                    states.add(state.name().toLowerCase(Locale.ROOT), count);
+                    queued += count;
+                }
+                JsonObjectBuilder backendStatus = Json.createObjectBuilder()
+                        .add("configured", searchIndexOperationService.isConfigured(backend))
+                        .add("healthy", status.getOrDefault(SearchIndexOperation.State.DEAD, 0L) == 0)
+                        .add("queued", queued)
+                        .add("states", states);
+                searchIndexOperationService.getBlockingOperation(backend).ifPresent(operation -> {
+                    JsonObjectBuilder blockingOperation = Json.createObjectBuilder()
+                            .add("id", operation.getId())
+                            .add("operationType", operation.getOperationType().name().toLowerCase(Locale.ROOT))
+                            .add("state", operation.getState().name().toLowerCase(Locale.ROOT))
+                            .add("attemptCount", operation.getAttemptCount())
+                            .add("createdAt", operation.getCreatedAt().toInstant().toString());
+                    if (operation.getLastError() != null) {
+                        blockingOperation.add("lastError", operation.getLastError());
+                    }
+                    backendStatus.add("blockingOperation", blockingOperation);
+                });
+                backends.add(backend.name().toLowerCase(Locale.ROOT), backendStatus);
+            }
+            return ok(Json.createObjectBuilder().add("backends", backends));
+        } catch (WrappedResponse wrappedResponse) {
+            return wrappedResponse.getResponse();
+        }
+    }
+
+    @POST
+    @AuthRequired
+    @Path("backends/{backend}/resume")
+    @Operation(summary = "Resumes a failed search index backend",
+            description = "Resets permanently failed operations for one backend and resumes ordered delivery.")
+    public Response resumeIndexBackend(@Context ContainerRequestContext crc,
+            @PathParam("backend") String backendName) {
+        try {
+            AuthenticatedUser user = getRequestAuthenticatedUserOrDie(crc);
+            if (!user.isSuperuser()) {
+                return error(Status.FORBIDDEN, "Superusers only.");
+            }
+
+            SearchIndexOperation.Backend backend;
+            try {
+                backend = SearchIndexOperation.Backend.valueOf(backendName.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                return error(Status.BAD_REQUEST, "Unknown search index backend: " + backendName);
+            }
+            int resumed = searchIndexOperationService.resume(backend);
+            return ok(Json.createObjectBuilder()
+                    .add("backend", backend.name().toLowerCase(Locale.ROOT))
+                    .add("operationsResumed", resumed));
+        } catch (WrappedResponse wrappedResponse) {
+            return wrappedResponse.getResponse();
+        }
+    }
+
     /**
      * Checks whether there are inconsistencies between the Solr index and 
      * the database, and reports back the status by content type

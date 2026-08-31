@@ -174,6 +174,7 @@ public class MeilisearchSearchServiceBean implements SearchService {
                 .add("q", meilisearchQuery)
                 .add("offset", 0)
                 .add("limit", candidateLimit)
+                .add("filter", SearchFields.TYPE + " = " + SearchConstants.DATASETS)
                 .add("attributesToRetrieve", attributes)
                 .add("showRankingScore", true);
         if (!meilisearchQuery.isEmpty() && embedder != null && !embedder.isBlank()) {

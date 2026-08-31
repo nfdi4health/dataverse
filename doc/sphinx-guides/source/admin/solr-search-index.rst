@@ -40,6 +40,29 @@ Please note that this operation may take hours depending on the amount of data i
 
 ``curl http://localhost:8080/api/admin/index``
 
+Index Backend Delivery Status
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When Meilisearch is configured, content indexing operations are delivered to
+both Solr and Meilisearch from a durable queue. Permission documents are
+delivered only to Solr. A failed backend operation is retried up to ten times;
+later operations for that backend remain queued to preserve ordering.
+
+Use a superuser API token to inspect the queue:
+
+.. code-block:: bash
+
+  curl -H "X-Dataverse-key:$API_TOKEN" \
+    http://localhost:8080/api/admin/index/backends/status
+
+After correcting the backend problem, reset its failed operation and resume
+delivery with ``solr`` or ``meilisearch`` as the backend name:
+
+.. code-block:: bash
+
+  curl -X POST -H "X-Dataverse-key:$API_TOKEN" \
+    http://localhost:8080/api/admin/index/backends/meilisearch/resume
+
 Reindex in Place
 +++++++++++++++++
 

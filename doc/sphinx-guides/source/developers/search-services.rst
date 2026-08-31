@@ -140,25 +140,27 @@ facets, and formatting the results expected by the UI and APIs.
 
 The service is included in the Dataverse war. Its service name is
 ``meilisearch``. It can be selected with ``search_service=meilisearch`` or set as
-``dataverse.search.default-service``. Because the Meilisearch index contains
-datasets only, setting it as the global default is not appropriate when
+``dataverse.search.default-service``. The query adapter currently handles
+datasets only, so setting it as the global default is not appropriate when
 collection and file results are required.
 
-Dataverse does not populate the Meilisearch index. An external process must keep
-it synchronized. Every document must expose a displayed string attribute named
-``dsPersistentId`` containing the same dataset persistent identifier stored in
-Solr. If the index restricts ``displayedAttributes``, that list must include
+When ``dataverse.search.meilisearch.url`` is configured, Dataverse mirrors all
+non-permission Solr documents to Meilisearch. Adds, replacements, deletes, and
+index clears are stored in a durable ordered queue and retried up to ten times.
+Permission documents remain in Solr only. Dataset documents expose the same
+``dsPersistentId`` attribute used in Solr so the adapter can hydrate and
+permission-filter Meilisearch results through Solr.
+
+If the index restricts ``displayedAttributes``, that list must include
 ``dsPersistentId``; otherwise Meilisearch omits the identifier from search hits
 and Dataverse cannot hydrate them from Solr. An attribute with another name,
-such as ``pid``, does not satisfy this contract. Use a separate integer or
-Meilisearch-compatible string as the primary key because Dataverse persistent
-identifiers contain characters that Meilisearch primary keys do not accept. For
-example:
+such as ``pid``, does not satisfy this contract. Dataverse uses the Solr
+document identifier as the Meilisearch primary key. For example:
 
 .. code-block:: json
 
     {
-      "id": 123,
+      "id": "dataset_123",
       "dsPersistentId": "doi:10.5072/FK2/ABC123",
       "title": "Dataset title",
       "description": "Searchable metadata"
@@ -168,8 +170,8 @@ Configure the connection with ``dataverse.search.meilisearch.url`` and the
 related settings described in the Installation Guide. Use a Meilisearch API key
 restricted to the ``search`` action and the configured index.
 
-The process that populates Meilisearch also owns its index settings. To use
-hybrid search, configure an embedder on the index and set
+The installation owns the Meilisearch index settings. To use hybrid search,
+configure an embedder on the index and set
 ``dataverse.search.meilisearch.embedder`` to the same name. For example,
 Meilisearch 1.53 can use a remote Ollama server without an OpenAI API key:
 

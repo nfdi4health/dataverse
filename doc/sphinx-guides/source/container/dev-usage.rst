@@ -484,8 +484,8 @@ Omit ``DATAVERSE_SEARCH_DEFAULT_SERVICE`` to keep Solr as the default and
 select Meilisearch per Search API request with
 ``search_service=meilisearch``. The Compose overlay creates the configured
 index and applies its required settings when Meilisearch starts with an empty
-volume. Documents must still be populated by an external process. See
-:doc:`/developers/search-services` for the index contract and
+volume. Dataverse mirrors indexed content to Meilisearch automatically. See
+:doc:`/developers/search-services` for the indexing contract and
 :doc:`/installation/config` for connection and hybrid-search settings.
 
 To have the initializer configure an Ollama embedder for hybrid search, also

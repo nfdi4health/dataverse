@@ -22,7 +22,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Duration;
+import java.sql.Timestamp;
 import java.io.StringReader;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @LocalJvmSettings
 @JvmSetting(key = JvmSettings.MEILISEARCH_URL, method = "meilisearchUrl")
 @JvmSetting(key = JvmSettings.MEILISEARCH_API_KEY, value = MeilisearchSearchServiceBeanIT.API_KEY)
+@JvmSetting(key = JvmSettings.MEILISEARCH_INDEX_API_KEY, value = MeilisearchSearchServiceBeanIT.API_KEY)
 class MeilisearchSearchServiceBeanIT {
 
     static final String API_KEY = "dataverse-test-master-key";
@@ -50,19 +53,30 @@ class MeilisearchSearchServiceBeanIT {
         try (Client client = ClientBuilder.newClient()) {
             JsonArray documents = Json.createArrayBuilder()
                     .add(Json.createObjectBuilder()
-                            .add("id", 1)
-                            .add("dsPersistentId", "doi:10.5072/FK2/FINCHES")
-                            .add("title", "Darwin's Finches"))
+                             .add("id", 1)
+                             .add("dsPersistentId", "doi:10.5072/FK2/FINCHES")
+                             .add("dvObjectType", "datasets")
+                             .add("title", "Darwin's Finches"))
                     .add(Json.createObjectBuilder()
-                            .add("id", 2)
-                            .add("dsPersistentId", "doi:10.5072/FK2/SPARROWS")
-                            .add("title", "House Sparrows"))
+                             .add("id", 2)
+                             .add("dsPersistentId", "doi:10.5072/FK2/SPARROWS")
+                             .add("dvObjectType", "datasets")
+                             .add("title", "House Sparrows"))
                     .build();
             try (Response response = client.target(meilisearchUrl()).path("indexes/datasets/documents")
                     .queryParam("primaryKey", "id")
                     .request(MediaType.APPLICATION_JSON_TYPE)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
                     .post(Entity.entity(documents.toString(), MediaType.APPLICATION_JSON_TYPE))) {
+                assertEquals(202, response.getStatus());
+                waitForTask(client, parseObject(response.readEntity(String.class)).getInt("taskUid"));
+            }
+            JsonArray filterableAttributes = Json.createArrayBuilder().add("dvObjectType").build();
+            try (Response response = client.target(meilisearchUrl())
+                    .path("indexes/datasets/settings/filterable-attributes")
+                    .request(MediaType.APPLICATION_JSON_TYPE)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
+                    .put(Entity.entity(filterableAttributes.toString(), MediaType.APPLICATION_JSON_TYPE))) {
                 assertEquals(202, response.getStatus());
                 waitForTask(client, parseObject(response.readEntity(String.class)).getInt("taskUid"));
             }
@@ -80,8 +94,56 @@ class MeilisearchSearchServiceBeanIT {
         assertTrue(results.values().iterator().next() > 0F);
     }
 
+    @Test
+    void replacesAndDeletesDocumentsThroughTheIndexBackend() throws Exception {
+        MeilisearchSearchIndexBackend backend = new MeilisearchSearchIndexBackend();
+        String initialPayload = Json.createArrayBuilder()
+                .add(Json.createObjectBuilder()
+                        .add("id", "dataset_3")
+                        .add("dvObjectType", "datasets")
+                        .add("dsPersistentId", "doi:10.5072/FK2/REPLACE")
+                        .add("title", "Initial title")
+                        .add("obsolete", "remove me"))
+                .build().toString();
+        backend.execute(operation(SearchIndexOperation.OperationType.UPSERT, initialPayload));
+
+        String replacementPayload = Json.createArrayBuilder()
+                .add(Json.createObjectBuilder()
+                        .add("id", "dataset_3")
+                        .add("dvObjectType", "datasets")
+                        .add("dsPersistentId", "doi:10.5072/FK2/REPLACE")
+                        .add("title", "Replacement title"))
+                .build().toString();
+        backend.execute(operation(SearchIndexOperation.OperationType.UPSERT, replacementPayload));
+
+        try (Client client = ClientBuilder.newClient();
+                Response response = client.target(meilisearchUrl()).path("indexes/datasets/documents/dataset_3")
+                        .request(MediaType.APPLICATION_JSON_TYPE)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
+                        .get()) {
+            assertEquals(200, response.getStatus());
+            JsonObject document = parseObject(response.readEntity(String.class));
+            assertEquals("Replacement title", document.getString("title"));
+            assertTrue(!document.containsKey("obsolete"));
+        }
+
+        backend.execute(operation(SearchIndexOperation.OperationType.DELETE, "[\"dataset_3\"]"));
+        try (Client client = ClientBuilder.newClient();
+                Response response = client.target(meilisearchUrl()).path("indexes/datasets/documents/dataset_3")
+                        .request(MediaType.APPLICATION_JSON_TYPE)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY)
+                        .get()) {
+            assertEquals(404, response.getStatus());
+        }
+    }
+
     static String meilisearchUrl() {
         return "http://" + meilisearch.getHost() + ":" + meilisearch.getMappedPort(PORT);
+    }
+
+    private static SearchIndexOperation operation(SearchIndexOperation.OperationType type, String payload) {
+        return new SearchIndexOperation(SearchIndexOperation.Backend.MEILISEARCH, type, payload,
+                Timestamp.from(Instant.now()));
     }
 
     private static void waitForTask(Client client, int taskUid) throws Exception {
