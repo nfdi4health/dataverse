@@ -130,6 +130,81 @@ They are intended only as code examples and simple tests of the design and are n
 The former simply replaces the user query with a query for entities with a db id < 1000. It demonstrates how a class can leverage the solr engine and achieve results solely by modifying/replacing the user query. 
 The latter only returns hits from the user's query that also have an odd database id. Since the filtering in the class changes the number of total hits available and pagination, this class demonstrates one way a developer can adjust those aspects of the Solr response.
 
+5. MeilisearchSearchServiceBean
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``MeilisearchSearchServiceBean`` is a datasets-only built-in search service. It
+uses Meilisearch to rank persistent identifiers and then queries Solr for those
+identifiers. Solr remains responsible for permissions, Dataverse filters,
+facets, and formatting the results expected by the UI and APIs.
+
+The service is included in the Dataverse war. Its service name is
+``meilisearch``. It can be selected with ``search_service=meilisearch`` or set as
+``dataverse.search.default-service``. The query adapter currently handles
+datasets only, so setting it as the global default is not appropriate when
+collection and file results are required.
+
+When ``dataverse.search.meilisearch.url`` is configured, Dataverse mirrors all
+non-permission Solr documents to Meilisearch. Adds, replacements, deletes, and
+index clears are stored in a durable ordered queue and retried up to ten times.
+Permission documents remain in Solr only. Dataset documents expose the same
+``dsPersistentId`` attribute used in Solr so the adapter can hydrate and
+permission-filter Meilisearch results through Solr.
+
+If the index restricts ``displayedAttributes``, that list must include
+``dsPersistentId``; otherwise Meilisearch omits the identifier from search hits
+and Dataverse cannot hydrate them from Solr. An attribute with another name,
+such as ``pid``, does not satisfy this contract. Dataverse uses the Solr
+document identifier as the Meilisearch primary key. For example:
+
+.. code-block:: json
+
+    {
+      "id": "dataset_123",
+      "dsPersistentId": "doi:10.5072/FK2/ABC123",
+      "title": "Dataset title",
+      "description": "Searchable metadata"
+    }
+
+Configure the connection with ``dataverse.search.meilisearch.url`` and the
+related settings described in the Installation Guide. Use a Meilisearch API key
+restricted to the ``search`` action and the configured index.
+
+The installation owns the Meilisearch index settings. To use hybrid search,
+configure an embedder on the index and set
+``dataverse.search.meilisearch.embedder`` to the same name. For example,
+Meilisearch 1.53 can use a remote Ollama server without an OpenAI API key:
+
+.. code-block:: json
+
+    {
+      "ollama": {
+        "source": "ollama",
+        "url": "https://ollama.example.org/api/embed",
+        "model": "your-embedding-model",
+        "documentTemplate": "{{doc.title}} {{doc.description}}"
+      }
+    }
+
+Send this object to the Meilisearch
+``/indexes/{index}/settings/embedders`` endpoint before adding documents. The
+Ollama URL must end in ``/api/embed`` or ``/api/embeddings`` and must be
+reachable from Meilisearch. If it resolves to a private address, configure
+Meilisearch's ``MEILI_EXPERIMENTAL_ALLOWED_IP_NETWORKS`` setting appropriately.
+Dataverse does not connect to Ollama directly and does not need the Ollama URL
+or model name.
+
+The adapter sends plain text, quoted phrases, and placeholder searches to
+Meilisearch. When an embedder is configured, non-empty supported queries use
+hybrid ranking with the configured semantic ratio. Lucene field queries,
+ranges, boolean operators, wildcards,
+geospatial searches, My Data searches, and file- or collection-only searches
+fall back to Solr. Meilisearch results are collected from the start of the
+ranking up to the configured candidate limit, filtered through Solr, and then
+paginated. As a result, totals and facets cover accessible candidates within
+that limit rather than every possible Meilisearch hit. Solr cannot recreate
+Meilisearch snippets or spelling suggestions from the PID hydration query.
+
 Notes
 -----
 
@@ -138,4 +213,3 @@ Notes
 3. Search services could be designed to completely replace Solr or to just support certain use cases (e.g. the external search classes only handling datasets).
 4. While search services can be deployed as independent jar files, they currently import multiple Dataverse classes and, unlike exporters, cannot be built using just the Dataverse SPI.
 5. As with other experimental features, we expect the ``SearchService`` interface may change over time as we learn about how people use it. Please keep in touch if you are developing search services.
-

@@ -64,3 +64,7 @@ src/main/webapp/resources/images/dataverseproject.png.thumb140
 /conf/keycloak/docker-dev-volumes
 /docker-dev-volumes
 /.vs
+
+# Durable search-index queue (Solr + Meilisearch)
+.factorypath
+sample-data/

@@ -1,0 +1,5 @@
+{
+  "searchableAttributes": ["title", "text"],
+  "displayedAttributes": ["id", "dsPersistentId", "title"],
+  "filterableAttributes": ["dvObjectType"]
+}
