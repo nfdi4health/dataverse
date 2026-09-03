@@ -16,12 +16,14 @@ import edu.harvard.iq.dataverse.authorization.groups.impl.ipaddress.ip.IpAddress
 import edu.harvard.iq.dataverse.authorization.groups.impl.maildomain.MailDomainGroup;
 import edu.harvard.iq.dataverse.authorization.groups.impl.maildomain.MailDomainGroupTest;
 import edu.harvard.iq.dataverse.authorization.users.GuestUser;
+import edu.harvard.iq.dataverse.datasetrelation.DatasetRelationServiceBean;
 import edu.harvard.iq.dataverse.dataset.DatasetType;
 import edu.harvard.iq.dataverse.dataset.DatasetTypeServiceBean;
 import edu.harvard.iq.dataverse.engine.command.DataverseRequest;
 import edu.harvard.iq.dataverse.license.LicenseServiceBean;
 import edu.harvard.iq.dataverse.mocks.MockDatasetFieldSvc;
 import edu.harvard.iq.dataverse.settings.SettingsServiceBean;
+import edu.harvard.iq.dataverse.api.dto.DatasetRelationDTO;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +61,7 @@ public class JsonParserTest {
     MockSettingsSvc settingsSvc = null;
     LicenseServiceBean licenseService = Mockito.mock(LicenseServiceBean.class);
     DatasetTypeServiceBean datasetTypeService = Mockito.mock(DatasetTypeServiceBean.class);
+    DatasetRelationServiceBean datasetRelationService = Mockito.mock(DatasetRelationServiceBean.class);
     DatasetFieldType keywordType;
     DatasetFieldType descriptionType;
     DatasetFieldType subjectType;
@@ -167,7 +170,7 @@ public class JsonParserTest {
         datasetType.setName(DatasetType.DEFAULT_DATASET_TYPE);
         datasetType.setId(1l);
         Mockito.when(datasetTypeService.getByName(DatasetType.DEFAULT_DATASET_TYPE)).thenReturn(datasetType);
-        sut = new JsonParser(datasetFieldTypeSvc, null, settingsSvc, licenseService, datasetTypeService);
+        sut = new JsonParser(datasetFieldTypeSvc, null, settingsSvc, licenseService, datasetTypeService, datasetRelationService);
     }
     
     @Test 
@@ -796,6 +799,19 @@ public class JsonParserTest {
         assertEquals(4, gb.getCustomQuestions().get(2).getCustomQuestionValues().size());
         assertEquals("Purple", gb.getCustomQuestions().get(2).getCustomQuestionValues().get(3).getValueString());
         assertEquals(3, gb.getCustomQuestions().get(2).getCustomQuestionValues().get(3).getDisplayOrder());
+    }
+
+    @Test
+    public void testParseExternalDatasetRelationDTOWithDatasetType() throws JsonParseException {
+        String json = "{\"externalIdentifier\":\"10.1234/ext-1\", \"identifierScheme\":\"doi\", \"datasetType\":\"Journal Article\", \"relationTypeName\":\"isReferencedBy\"}";
+        JsonObject jsonObject = JsonUtil.getJsonObject(json);
+        DatasetRelationDTO dto = sut.parseDatasetRelationDTO(jsonObject);
+
+        assertNotNull(dto);
+        assertEquals("10.1234/ext-1", dto.getExternalIdentifier());
+        assertEquals("doi", dto.getIdentifierScheme());
+        assertEquals("Journal Article", dto.getDatasetType());
+        assertEquals("isReferencedBy", dto.getRelationTypeName());
     }
 
     @Test

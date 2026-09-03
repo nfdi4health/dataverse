@@ -4,9 +4,7 @@ import edu.harvard.iq.dataverse.*;
 import edu.harvard.iq.dataverse.DatasetLock.Reason;
 import edu.harvard.iq.dataverse.actionlogging.ActionLogRecord;
 import edu.harvard.iq.dataverse.api.auth.AuthRequired;
-import edu.harvard.iq.dataverse.api.dto.CustomTermsDTO;
-import edu.harvard.iq.dataverse.api.dto.LicenseUpdateRequest;
-import edu.harvard.iq.dataverse.api.dto.RoleAssignmentDTO;
+import edu.harvard.iq.dataverse.api.dto.*;
 import edu.harvard.iq.dataverse.authorization.AuthenticationServiceBean;
 import edu.harvard.iq.dataverse.authorization.DataverseRole;
 import edu.harvard.iq.dataverse.authorization.Permission;
@@ -19,10 +17,7 @@ import edu.harvard.iq.dataverse.batch.jobs.importer.ImportMode;
 import edu.harvard.iq.dataverse.dataaccess.*;
 import edu.harvard.iq.dataverse.datacapturemodule.DataCaptureModuleUtil;
 import edu.harvard.iq.dataverse.datacapturemodule.ScriptRequestResponse;
-import edu.harvard.iq.dataverse.dataset.DatasetThumbnail;
-import edu.harvard.iq.dataverse.dataset.DatasetType;
-import edu.harvard.iq.dataverse.dataset.DatasetTypeServiceBean;
-import edu.harvard.iq.dataverse.dataset.DatasetUtil;
+import edu.harvard.iq.dataverse.dataset.*;
 import edu.harvard.iq.dataverse.datasetutility.AddReplaceFileHelper;
 import edu.harvard.iq.dataverse.datasetutility.DataFileTagException;
 import edu.harvard.iq.dataverse.datasetutility.NoFilesException;
@@ -68,6 +63,7 @@ import jakarta.ejb.EJBException;
 import jakarta.inject.Inject;
 import jakarta.json.*;
 import jakarta.json.stream.JsonParsingException;
+import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.ws.rs.*;
@@ -489,6 +485,7 @@ public class Datasets extends AbstractApiBean {
                                @PathParam("id") String datasetId,
                                @PathParam("versionId") String versionId,
                                @QueryParam("excludeFiles") Boolean excludeFiles,
+                               @QueryParam("excludeRelations") Boolean excludeRelations,
                                @QueryParam("excludeMetadataBlocks") Boolean excludeMetadataBlocks,
                                @QueryParam("includeDeaccessioned") boolean includeDeaccessioned,
                                @QueryParam("returnOwners") boolean returnOwners,
@@ -498,6 +495,7 @@ public class Datasets extends AbstractApiBean {
         return response( req -> {
             boolean includeMetadataBlocks = excludeMetadataBlocks == null ? true : !excludeMetadataBlocks;
             boolean includeFiles = excludeFiles == null ? true : !excludeFiles;
+            boolean includeRelations = excludeRelations == null ? true : !excludeRelations;
             boolean ignoreSettingExcludeEmailFromExport = ignoreSettingToExcludeEmailFromExport != null ? ignoreSettingToExcludeEmailFromExport : false;
 
             //If excludeFiles is null the default is to provide the files and because of this we need to check permissions.
@@ -526,7 +524,7 @@ public class Datasets extends AbstractApiBean {
                 ignoreSettingExcludeEmailFromExport = false;
             }
 
-            JsonObjectBuilder jsonBuilder = json(requestedDatasetVersion, null, includeFiles,
+            JsonObjectBuilder jsonBuilder = json(requestedDatasetVersion, null, includeFiles, includeRelations,
                     returnOwners, includeMetadataBlocks, ignoreSettingExcludeEmailFromExport);
             return ok(jsonBuilder);
 
@@ -835,7 +833,10 @@ public class Datasets extends AbstractApiBean {
             DataverseRequest req = createDataverseRequest(getRequestUser(crc));
             Dataset ds = findDatasetOrDie(id);
             JsonObject json = JsonUtil.getJsonObject(jsonBody);
-            DatasetVersion incomingVersion = jsonParser().parseDatasetVersion(json);
+            List<DatasetRelationDTO> relationDTOs = jsonParser().parseDatasetRelationDTOs(json);
+            DatasetVersion incomingVersion = new DatasetVersion();
+            incomingVersion.setDataset(ds);
+            incomingVersion = jsonParser().parseDatasetVersion(json, incomingVersion);
 
             // clear possibly stale fields from the incoming dataset version.
             // creation and modification dates are updated by the commands.
@@ -846,6 +847,11 @@ public class Datasets extends AbstractApiBean {
             incomingVersion.setDataset(ds);
             incomingVersion.setCreateTime(null);
             incomingVersion.setLastUpdateTime(null);
+
+            if (relationDTOs != null
+                    && !permissionSvc.permissionsFor(req, ds).contains(Permission.EditDatasetRelations)) {
+                return unauthorized(BundleUtil.getStringFromBundle("datasets.api.datasetRelation.error.editNotAuthorized"));
+            }
 
             if (!incomingVersion.getFileMetadatas().isEmpty()){
                 return error( Response.Status.BAD_REQUEST, "You may not add files via this api.");
@@ -864,6 +870,7 @@ public class Datasets extends AbstractApiBean {
                 editVersion.setDatasetFields(incomingVersion.getDatasetFields());
                 editVersion.setTermsOfUseAndAccess(incomingVersion.getTermsOfUseAndAccess());
                 editVersion.getTermsOfUseAndAccess().setDatasetVersion(editVersion);
+
                 boolean hasValidTerms = TermsOfUseAndAccessValidator.isTOUAValid(editVersion.getTermsOfUseAndAccess(), null);
                 if (!hasValidTerms) {
                     return error(Status.CONFLICT, BundleUtil.getStringFromBundle("dataset.message.toua.invalid"));
@@ -871,11 +878,20 @@ public class Datasets extends AbstractApiBean {
                 Dataset managedDataset = execCommand(new UpdateDatasetVersionCommand(ds, req));
                 managedVersion = managedDataset.getOrCreateEditVersion();
             } else {
+                if (relationDTOs == null && ds.getLatestVersion().getRelations() != null) {
+                    DatasetVersion newDraft = incomingVersion;
+                    incomingVersion.setRelations(ds.getLatestVersion().getRelations().stream()
+                            .map(relation -> relation.copy(newDraft))
+                            .toList());
+                }
                 boolean hasValidTerms = TermsOfUseAndAccessValidator.isTOUAValid(incomingVersion.getTermsOfUseAndAccess(), null);
                 if (!hasValidTerms) {
                     return error(Status.CONFLICT, BundleUtil.getStringFromBundle("dataset.message.toua.invalid"));
                 }
                 managedVersion = execCommand(new CreateDatasetVersionCommand(req, ds, incomingVersion));
+            }
+            if (relationDTOs != null) {
+                execCommand(new ReplaceDatasetRelationsCommand(managedVersion, relationDTOs, req));
             }
             return ok( json(managedVersion, true) );
 
