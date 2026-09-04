@@ -1150,6 +1150,9 @@ public class JsonPrinter {
     }
 
     public static JsonArrayBuilder json(List<DatasetRelation> rel, Dataset forDataset, boolean includeMetadataBlocks) {
+        if (rel == null) {
+            return null;
+        }
         return rel.stream().map(r -> json(r, forDataset, includeMetadataBlocks)).collect(toJsonArray());
     }
 
