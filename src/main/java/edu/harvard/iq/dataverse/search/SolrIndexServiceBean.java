@@ -34,6 +34,7 @@ import jakarta.ejb.EJB;
 import jakarta.ejb.Stateless;
 import jakarta.ejb.TransactionAttribute;
 import jakarta.ejb.TransactionAttributeType;
+import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.json.Json;
 import jakarta.json.JsonObjectBuilder;
@@ -69,8 +70,9 @@ public class SolrIndexServiceBean {
     DatasetVersionServiceBean datasetVersionService;
     @EJB
     DataverseRoleServiceBean rolesSvc;
-    @EJB
-    SolrClientIndexService solrClientService;
+    @Inject
+    @Named("solrIndexAdapter")
+    SearchIndexAdapter searchIndexAdapter;
     
     @PersistenceContext(unitName = "VDCNet-ejbPU")
     private EntityManager em;
@@ -296,7 +298,11 @@ public class SolrIndexServiceBean {
         /**
          * @todo Do something with these responses from Solr.
          */
-        solrClientService.getSolrClient().add(docs);
+        try {
+            searchIndexAdapter.add(docs);
+        } catch (SearchException ex) {
+            throw new IOException("Unable to persist permission documents to the search index", ex);
+        }
     }
 
     /**
@@ -558,8 +564,8 @@ public class SolrIndexServiceBean {
             return new IndexResponse("nothing to delete");
         }
         try {
-            solrClientService.getSolrClient().deleteById(solrIdsToDelete);
-        } catch (SolrServerException | IOException ex) {
+            searchIndexAdapter.deleteByIds(solrIdsToDelete);
+        } catch (SearchException ex) {
             /**
              * @todo mark these for re-deletion
              */
@@ -571,7 +577,11 @@ public class SolrIndexServiceBean {
     public JsonObjectBuilder deleteAllFromSolrAndResetIndexTimes() throws SolrServerException, IOException {
         JsonObjectBuilder response = JsonUtil.createObjectBuilder();
         logger.fine("attempting to delete all Solr documents before a complete re-index");
-        solrClientService.getSolrClient().deleteByQuery("*:*");
+        try {
+            searchIndexAdapter.deleteAll();
+        } catch (SearchException ex) {
+            throw new IOException("Unable to clear the search index", ex);
+        }
         int numRowsAffected = dvObjectService.clearAllIndexTimes();
         response.add(numRowsClearedByClearAllIndexTimes, numRowsAffected);
         response.add(messageString, "Solr index and database index timestamps cleared.");
