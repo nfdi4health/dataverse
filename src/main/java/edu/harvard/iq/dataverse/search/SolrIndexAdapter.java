@@ -50,15 +50,6 @@ public class SolrIndexAdapter implements SearchIndexAdapter {
     }
 
     @Override
-    public void flush() throws SearchException {
-        try {
-            clientService.getSolrClient().commit();
-        } catch (SolrServerException | IOException ex) {
-            throw failure("flush pending operations", ex);
-        }
-    }
-
-    @Override
     public String getServiceName() {
         return SearchServiceFactory.INTERNAL_SOLR_SERVICE_NAME;
     }

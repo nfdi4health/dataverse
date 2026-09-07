@@ -13,9 +13,4 @@ public interface SearchIndexAdapter {
     void deleteByIds(Collection<String> ids) throws SearchException;
 
     void deleteAll() throws SearchException;
-
-    /**
-     * Make previously submitted operations observable to subsequent searches.
-     */
-    void flush() throws SearchException;
 }

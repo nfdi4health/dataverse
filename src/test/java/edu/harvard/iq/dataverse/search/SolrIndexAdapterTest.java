@@ -74,13 +74,6 @@ class SolrIndexAdapterTest {
     }
 
     @Test
-    void flushesPendingOperations() throws Exception {
-        adapter.flush();
-
-        verify(solrClient).commit();
-    }
-
-    @Test
     void wrapsClientFailures() throws Exception {
         IOException cause = new IOException("unavailable");
         when(solrClient.deleteById(List.of("dataset_1"))).thenThrow(cause);

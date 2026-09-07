@@ -153,7 +153,7 @@ public class IndexServiceBean {
     @EJB
     SolrClientService solrClientService; // only for query index on Solr
     @Inject
-    @Named("solrIndexAdapter")
+    @Named("configuredIndexAdapter")
     SearchIndexAdapter searchIndexAdapter;
     @EJB
     DataFileServiceBean dataFileService;

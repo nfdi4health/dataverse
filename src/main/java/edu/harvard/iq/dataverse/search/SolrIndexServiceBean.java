@@ -71,7 +71,7 @@ public class SolrIndexServiceBean {
     @EJB
     DataverseRoleServiceBean rolesSvc;
     @Inject
-    @Named("solrIndexAdapter")
+    @Named("configuredIndexAdapter")
     SearchIndexAdapter searchIndexAdapter;
     
     @PersistenceContext(unitName = "VDCNet-ejbPU")
