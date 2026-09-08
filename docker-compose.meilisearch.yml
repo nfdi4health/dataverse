@@ -1,0 +1,77 @@
+services:
+
+  dev_dataverse:
+    environment:
+      DATAVERSE_SEARCH_INDEX_SERVICE: dual
+      DATAVERSE_SEARCH_MEILISEARCH_URL: http://meilisearch:7700
+      DATAVERSE_SEARCH_MEILISEARCH_API_KEY: ${DATAVERSE_SEARCH_MEILISEARCH_API_KEY:-dataverse-test-master-key}
+      DATAVERSE_SEARCH_MEILISEARCH_INDEX: ${DATAVERSE_SEARCH_MEILISEARCH_INDEX:-dataverse}
+      DATAVERSE_SEARCH_MEILISEARCH_CANDIDATE_LIMIT: ${DATAVERSE_SEARCH_MEILISEARCH_CANDIDATE_LIMIT:-1000}
+      DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER:-qwen3-embedding:8b}
+      DATAVERSE_SEARCH_MEILISEARCH_SEMANTIC_RATIO: ${DATAVERSE_SEARCH_MEILISEARCH_SEMANTIC_RATIO:-0.5}
+      DATAVERSE_SEARCH_MEILISEARCH_BATCH_SIZE: ${DATAVERSE_SEARCH_MEILISEARCH_BATCH_SIZE:-500}
+      DATAVERSE_SEARCH_MEILISEARCH_CONNECT_TIMEOUT_SECONDS: ${DATAVERSE_SEARCH_MEILISEARCH_CONNECT_TIMEOUT_SECONDS:-10}
+      DATAVERSE_SEARCH_MEILISEARCH_REQUEST_TIMEOUT_SECONDS: ${DATAVERSE_SEARCH_MEILISEARCH_REQUEST_TIMEOUT_SECONDS:-30}
+      DATAVERSE_SEARCH_MEILISEARCH_TASK_TIMEOUT_SECONDS: ${DATAVERSE_SEARCH_MEILISEARCH_TASK_TIMEOUT_SECONDS:-300}
+    depends_on:
+      dev_meilisearch:
+        condition: service_healthy
+      dev_meilisearch_initializer:
+        condition: service_completed_successfully
+
+  dev_meilisearch:
+    container_name: dev_meilisearch
+    hostname: meilisearch
+    image: getmeili/meilisearch:${DATAVERSE_SEARCH_MEILISEARCH_IMAGE_VERSION:-v1.53.1}
+    restart: on-failure
+    environment:
+      MEILI_ENV: development
+      # These MEILI_* names are fixed by the upstream Meilisearch image.
+      MEILI_MASTER_KEY: ${DATAVERSE_SEARCH_MEILISEARCH_API_KEY:-dataverse-test-master-key}
+      MEILI_DB_PATH: /meili_data/data.ms
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_HTTP_PAYLOAD_SIZE_LIMIT: "524288000"
+      MEILI_EXPERIMENTAL_REST_EMBEDDER_TIMEOUT_SECONDS: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER_TIMEOUT_SECONDS:-120}
+      # POC only: allow the development instance to call the company Ollama server.
+      MEILI_EXPERIMENTAL_ALLOWED_IP_NETWORKS: "10.0.0.0/8"
+    ports:
+      - "127.0.0.1:${DATAVERSE_SEARCH_MEILISEARCH_PUBLISHED_PORT:-17700}:7700"
+    networks:
+      dataverse:
+        aliases:
+          - meilisearch
+    volumes:
+      - dev_meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  dev_meilisearch_initializer:
+    image: curlimages/curl:${CURL_VERSION:-8.18.0}
+    restart: "no"
+    depends_on:
+      dev_meilisearch:
+        condition: service_healthy
+    environment:
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${DATAVERSE_SEARCH_MEILISEARCH_API_KEY:-dataverse-test-master-key}
+      MEILI_INDEX: ${DATAVERSE_SEARCH_MEILISEARCH_INDEX:-dataverse}
+      MEILI_PRIMARY_KEY: id
+      MEILI_SETTINGS_FILE: /conf/meilisearch/settings.json
+      MEILI_TASK_TIMEOUT_SECONDS: ${DATAVERSE_SEARCH_MEILISEARCH_TASK_TIMEOUT_SECONDS:-300}
+      MEILI_EMBEDDER_NAME: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER:-qwen3-embedding:8b}
+      MEILI_EMBEDDER_MODEL: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER_MODEL:-qwen3-embedding:8b}
+      MEILI_EMBEDDER_URL: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER_URL:-http://10.0.7.20:11435/api/embed}
+      MEILI_EMBEDDER_DIMENSIONS: ${DATAVERSE_SEARCH_MEILISEARCH_EMBEDDER_DIMENSIONS:-4096}
+    entrypoint: /bin/sh
+    command: ["/conf/meilisearch/initialize.sh"]
+    networks:
+      - dataverse
+    volumes:
+      - ./conf/meilisearch:/conf/meilisearch:ro
+
+volumes:
+  dev_meilisearch_data:

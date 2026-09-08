@@ -1,0 +1,8 @@
+{
+  "searchableAttributes": ["*"],
+  "displayedAttributes": ["*"],
+  "pagination": {
+    "maxTotalHits": 1000
+  },
+  "searchCutoffMs": 30000
+}
