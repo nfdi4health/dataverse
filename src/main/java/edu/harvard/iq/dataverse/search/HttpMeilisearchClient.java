@@ -40,6 +40,65 @@ public class HttpMeilisearchClient implements MeilisearchClient {
     }
 
     @Override
+    public boolean indexExists() throws SearchException {
+        return send("GET", indexPath(""), null, 404).containsKey("uid");
+    }
+
+    @Override
+    public long createIndex(String primaryKey) throws SearchException {
+        return taskUid(send("POST", "/indexes", Map.of(
+                "uid", configuration.index(),
+                "primaryKey", primaryKey)));
+    }
+
+    @Override
+    public Map<String, Object> getSettings() throws SearchException {
+        return send("GET", indexPath("/settings"), null);
+    }
+
+    @Override
+    public long updateSettings(Map<String, Object> settings) throws SearchException {
+        return taskUid(send("PATCH", indexPath("/settings"), settings));
+    }
+
+    @Override
+    public SearchResult search(SearchRequest searchRequest) throws SearchException {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("q", searchRequest.query());
+        body.put("offset", 0);
+        body.put("limit", searchRequest.limit());
+        body.put("filter", searchRequest.filter());
+        body.put("attributesToRetrieve", List.of(SearchFields.DATASET_PERSISTENT_ID));
+        body.put("showRankingScore", true);
+        if (searchRequest.embedder() != null && !searchRequest.query().isBlank()) {
+            body.put("hybrid", Map.of(
+                    "embedder", searchRequest.embedder(),
+                    "semanticRatio", searchRequest.semanticRatio()));
+        }
+
+        Map<String, Object> response = send("POST", indexPath("/search"), body);
+        Object rawHits = response.get("hits");
+        if (!(rawHits instanceof List<?> hits)) {
+            throw new SearchException("Meilisearch response does not contain a hits array", null);
+        }
+        List<SearchHit> parsed = new java.util.ArrayList<>(hits.size());
+        for (Object rawHit : hits) {
+            if (!(rawHit instanceof Map<?, ?> hit)) {
+                throw new SearchException("Meilisearch returned a non-object hit", null);
+            }
+            Object rawPid = hit.get(SearchFields.DATASET_PERSISTENT_ID);
+            if (rawPid == null || rawPid.toString().isBlank()) {
+                throw new SearchException("Meilisearch hit does not contain a non-empty "
+                        + SearchFields.DATASET_PERSISTENT_ID, null);
+            }
+            Object rawScore = hit.get("_rankingScore");
+            float score = rawScore instanceof Number number ? number.floatValue() : 0F;
+            parsed.add(new SearchHit(rawPid.toString(), score));
+        }
+        return new SearchResult(List.copyOf(parsed));
+    }
+
+    @Override
     public long addDocuments(List<Map<String, Object>> documents) throws SearchException {
         return taskUid(send("POST", indexPath("/documents"), documents));
     }
@@ -75,6 +134,12 @@ public class HttpMeilisearchClient implements MeilisearchClient {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> send(String method, String path, Object body) throws SearchException {
+        return send(method, path, body, new int[0]);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> send(String method, String path, Object body, int... acceptedStatuses)
+            throws SearchException {
         String baseUrl = configuration.url();
         logger.log(Level.FINE, "Calling Meilisearch: {0} {1}", new Object[] { method, path });
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(stripTrailingSlash(baseUrl) + path))
@@ -93,6 +158,9 @@ public class HttpMeilisearchClient implements MeilisearchClient {
             HttpResponse<String> response = httpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
             logger.log(Level.FINE, "Meilisearch returned HTTP {0} for {1} {2}",
                     new Object[] { response.statusCode(), method, path });
+            if (java.util.Arrays.stream(acceptedStatuses).anyMatch(status -> status == response.statusCode())) {
+                return Map.of();
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 logger.log(Level.WARNING, "Meilisearch request failed with HTTP {0} for {1} {2}",
                         new Object[] { response.statusCode(), method, path });

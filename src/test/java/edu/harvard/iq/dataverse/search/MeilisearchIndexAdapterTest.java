@@ -68,6 +68,16 @@ class MeilisearchIndexAdapterTest {
         private long requestedTaskId;
         private Task task = new Task(12L, "succeeded", null);
 
+        @Override public boolean indexExists() { return true; }
+        @Override public long createIndex(String primaryKey) { return 0; }
+        @Override public Map<String, Object> getSettings() { return Map.of(); }
+        @Override public long updateSettings(Map<String, Object> settings) { return 0; }
+
+        @Override
+        public SearchResult search(SearchRequest request) {
+            return new SearchResult(List.of());
+        }
+
         @Override
         public long addDocuments(List<Map<String, Object>> documents) {
             addedDocuments = documents;
