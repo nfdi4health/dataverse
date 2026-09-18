@@ -42,12 +42,15 @@ fi
 
 echo "Starting dev stack (SKIP_DEPLOY=1)..."
 export SKIP_DEPLOY=1
+compose_args=(-f docker-compose-dev.yml)
+if [ -n "${DATAVERSE_COMPOSE_OVERLAY:-}" ]; then
+    compose_args+=(-f "$DATAVERSE_COMPOSE_OVERLAY")
+fi
 # Use override file if it exists (for local customizations like memory limits)
 if [ -f docker-compose.override.yml ]; then
-    docker compose -f docker-compose-dev.yml -f docker-compose.override.yml up -d
-else
-    docker compose -f docker-compose-dev.yml up -d
+    compose_args+=(-f docker-compose.override.yml)
 fi
+docker compose "${compose_args[@]}" up -d --remove-orphans
 
 echo "Waiting for Payara to be ready..."
 until curl -sf http://localhost:8080/ >/dev/null 2>&1; do
