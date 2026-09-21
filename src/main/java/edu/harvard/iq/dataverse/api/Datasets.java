@@ -851,12 +851,7 @@ public class Datasets extends AbstractApiBean {
                 return error( Response.Status.BAD_REQUEST, "You may not add files via this api.");
             }
 
-            DatasetVersion latestVersion = ds.getLatestVersion();
-            if (isDatasetVersionNoOp(incomingVersion, latestVersion)) {
-                return ok(json(latestVersion, true));
-            }
-
-            boolean updateDraft = latestVersion.isDraft();
+            boolean updateDraft = ds.getLatestVersion().isDraft();
 
             DatasetVersion managedVersion;
             if (updateDraft) {
@@ -874,6 +869,10 @@ public class Datasets extends AbstractApiBean {
                 boolean hasValidTerms = TermsOfUseAndAccessValidator.isTOUAValid(incomingVersion.getTermsOfUseAndAccess(), null);
                 if (!hasValidTerms) {
                     return error(Status.CONFLICT, BundleUtil.getStringFromBundle("dataset.message.toua.invalid"));
+                }
+                DatasetVersion latestVersion = ds.getLatestVersion();
+                if (isDatasetVersionNoOp(incomingVersion, latestVersion)) {
+                    return ok(json(latestVersion, true));
                 }
                 managedVersion = execCommand(new CreateDatasetVersionCommand(req, ds, incomingVersion));
             }
