@@ -38,6 +38,7 @@ import edu.harvard.iq.dataverse.batch.util.LoggingUtil;
 import edu.harvard.iq.dataverse.dataaccess.DataAccess;
 import edu.harvard.iq.dataverse.dataaccess.DataAccessRequest;
 import edu.harvard.iq.dataverse.dataaccess.StorageIO;
+import edu.harvard.iq.dataverse.datasetrelation.DatasetRelationServiceBean;
 import edu.harvard.iq.dataverse.dataset.DatasetType;
 import edu.harvard.iq.dataverse.datavariable.DataVariable;
 import edu.harvard.iq.dataverse.datavariable.VariableMetadata;
@@ -69,7 +70,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -94,7 +94,6 @@ import jakarta.inject.Named;
 import jakarta.json.JsonObject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -137,6 +136,8 @@ public class IndexServiceBean {
     DatasetServiceBean datasetService;
     @EJB
     DatasetVersionServiceBean datasetVersionService;
+    @EJB
+    DatasetRelationServiceBean datasetRelationService;
     @EJB
     BuiltinUserServiceBean dataverseUserServiceBean;
     @EJB
@@ -1067,6 +1068,8 @@ public class IndexServiceBean {
         DatasetVersion datasetVersion = indexableDataset.getDatasetVersion();
         String parentDatasetTitle = "TBD";
         if (datasetVersion != null) {
+
+            solrInputDocument.addField(SearchFields.RELATED_DATASET_COUNT, datasetRelationService.getTotalDatasetRelationCountFor(dataset, datasetVersion));
 
             addLicenseToSolrDoc(solrInputDocument, datasetVersion);
 

@@ -86,6 +86,10 @@ public class SolrSearchResult {
     */
     private Long fileCount;
     /**
+     * Only Datasets can have a related dataset count
+     */
+    private Long relatedDatasetCount;
+    /**
      * Only Dataverses can have a dataset count
      */
     private Long datasetCount;
@@ -635,6 +639,7 @@ public class SolrSearchResult {
                     }
                     nullSafeJsonBuilder.add("subjects", subjects);
                     nullSafeJsonBuilder.add("fileCount", this.fileCount);
+                    nullSafeJsonBuilder.add("relatedDatasetCount", this.relatedDatasetCount);
                     nullSafeJsonBuilder.add("versionId", dv.getId());
                     nullSafeJsonBuilder.add("versionState", dv.getVersionState().toString());
                     if (this.isPublishedState()) {
@@ -1446,5 +1451,13 @@ public class SolrSearchResult {
 
     public void setDatasetCount(Long datasetCount) {
         this.datasetCount = datasetCount;
+    }
+
+    public Long getRelatedDatasetCount() {
+        return relatedDatasetCount;
+    }
+
+    public void setRelatedDatasetCount(Long relatedDatasetCount) {
+        this.relatedDatasetCount = relatedDatasetCount;
     }
 }

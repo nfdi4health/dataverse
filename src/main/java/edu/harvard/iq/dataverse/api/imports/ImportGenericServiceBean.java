@@ -14,6 +14,8 @@ import edu.harvard.iq.dataverse.MetadataBlockServiceBean;
 import edu.harvard.iq.dataverse.api.dto.*;  
 import edu.harvard.iq.dataverse.api.dto.FieldDTO;
 import edu.harvard.iq.dataverse.api.dto.MetadataBlockDTO;
+import edu.harvard.iq.dataverse.datasetrelation.DatasetRelation;
+import edu.harvard.iq.dataverse.datasetrelation.DatasetRelationServiceBean;
 import edu.harvard.iq.dataverse.dataset.DatasetTypeServiceBean;
 import edu.harvard.iq.dataverse.license.LicenseServiceBean;
 import edu.harvard.iq.dataverse.pidproviders.doi.AbstractDOIProvider;
@@ -81,6 +83,9 @@ public class ImportGenericServiceBean {
     @EJB
     DatasetTypeServiceBean datasetTypeService;
 
+    @EJB
+    DatasetRelationServiceBean datasetRelationService;
+
     @PersistenceContext(unitName = "VDCNet-ejbPU")
     private EntityManager em;
     
@@ -117,7 +122,12 @@ public class ImportGenericServiceBean {
             logger.fine(json);
             JsonReader jsonReader = Json.createReader(new StringReader(json));
             JsonObject obj = jsonReader.readObject();
-            DatasetVersion dv = new JsonParser(datasetFieldSvc, blockService, settingsService, licenseService, datasetTypeService).parseDatasetVersion(obj, datasetVersion);
+            JsonParser parser = new JsonParser(datasetFieldSvc, blockService, settingsService, licenseService, datasetTypeService, datasetRelationService);
+            DatasetVersion dv = parser.parseDatasetVersion(obj, datasetVersion);
+            List<DatasetRelation> relations = parser.parseDatasetRelations(obj, dv);
+            if (relations != null) {
+                dv.setRelations(relations);
+            }
         } catch (XMLStreamException ex) {
             //Logger.getLogger("global").log(Level.SEVERE, null, ex);
             throw new EJBException("ERROR occurred while parsing XML fragment  ("+xmlToParse.substring(0, 64)+"...); ", ex);
