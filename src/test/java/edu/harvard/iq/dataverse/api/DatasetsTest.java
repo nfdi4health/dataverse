@@ -1,10 +1,9 @@
 package edu.harvard.iq.dataverse.api;
 
-import edu.harvard.iq.dataverse.*;
 import org.junit.jupiter.api.Test;
-
+import edu.harvard.iq.dataverse.DatasetVersion;
+import edu.harvard.iq.dataverse.TermsOfUseAndAccess;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -17,25 +16,20 @@ public class DatasetsTest {
 
     @Test
     public void testIsDatasetVersionNoOp() {
-        DatasetVersion incoming = emptyVersion();
-        DatasetVersion latest = emptyVersion();
-        assertTrue(Datasets.isDatasetVersionNoOp(incoming, latest));
+        DatasetVersion v1 = new DatasetVersion();
+        DatasetVersion v2 = new DatasetVersion();
 
-        DatasetField field = new DatasetField();
-        DatasetFieldType type = new DatasetFieldType();
-        type.setName("title");
-        type.setChildDatasetFieldTypes(List.of());
-        field.setDatasetFieldType(type);
-        field.setDatasetFieldValues(List.of(new DatasetFieldValue(field, "Changed title")));
-        incoming.setDatasetFields(List.of(field));
+        assertTrue(Datasets.isDatasetVersionNoOp(v1, v2));
 
-        assertFalse(Datasets.isDatasetVersionNoOp(incoming, latest));
-    }
+        TermsOfUseAndAccess toua1 = new TermsOfUseAndAccess();
+        toua1.setFileAccessRequest(true);
+        v1.setTermsOfUseAndAccess(toua1);
 
-    private static DatasetVersion emptyVersion() {
-        DatasetVersion v = new DatasetVersion();
-        v.setTermsOfUseAndAccess(new TermsOfUseAndAccess());
-        return v;
+        TermsOfUseAndAccess toua2 = new TermsOfUseAndAccess();
+        toua2.setFileAccessRequest(false);
+        v2.setTermsOfUseAndAccess(toua2);
+
+        assertFalse(Datasets.isDatasetVersionNoOp(v1, v2));
     }
 
     /**

@@ -891,7 +891,11 @@ public class Datasets extends AbstractApiBean {
     // Helper extracted to make no-op detection testable.
     static boolean isDatasetVersionNoOp(DatasetVersion incomingVersion, DatasetVersion latestVersion) {
         DatasetVersionDifference diff = new DatasetVersionDifference(incomingVersion, latestVersion);
-        return diff.getDetailDataByBlock().isEmpty() && diff.getChangedTermsAccess().isEmpty();
+        TermsOfUseAndAccess incomingTermsofUseAndAccess = incomingVersion.getTermsOfUseAndAccess();
+        TermsOfUseAndAccess currentTermsofUseAndAccess = latestVersion.getTermsOfUseAndAccess();
+        boolean sameFileAccess = (incomingTermsofUseAndAccess != null && incomingTermsofUseAndAccess.isFileAccessRequest())
+                == (currentTermsofUseAndAccess != null && currentTermsofUseAndAccess.isFileAccessRequest());
+        return diff.getDetailDataByBlock().isEmpty() && diff.getChangedTermsAccess().isEmpty() && sameFileAccess;
     }
 
     @GET
