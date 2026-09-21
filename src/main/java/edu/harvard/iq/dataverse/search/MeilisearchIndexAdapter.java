@@ -34,7 +34,20 @@ public class MeilisearchIndexAdapter implements SearchIndexAdapter {
 
     @Override
     public void add(Collection<SolrInputDocument> documents) throws SearchException {
-        List<java.util.Map<String, Object>> mapped = mapper.mapAll(documents);
+        List<SolrInputDocument> docsToIndex = documents
+            .stream()
+            .filter(doc -> {
+                Object id = doc.getFieldValue("id");
+
+                boolean isNonPermissionDoc = (id != null) &&
+                    !(id.toString()
+                        .endsWith(IndexServiceBean.discoverabilityPermissionSuffix));
+
+                return isNonPermissionDoc;
+            })
+            .toList();
+
+        List<java.util.Map<String, Object>> mapped = mapper.mapAll(docsToIndex);
         if (mapped.isEmpty()) {
             return;
         }
