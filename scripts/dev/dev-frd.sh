@@ -18,6 +18,11 @@ if [ ! -d "target/classes" ]; then
     exit 1
 fi
 
+# A fast redeploy always targets an already initialized development database.
+# Keep the generated exploded application from attempting to recreate its tables.
+sed -i 's/<property name="eclipselink.ddl-generation" value="create-tables"\/>/<property name="eclipselink.ddl-generation" value="none"\/>/' \
+    target/dataverse/WEB-INF/classes/META-INF/persistence.xml
+
 echo "Syncing compiled classes..."
 # --delete removes files in dest not present in source
 rsync -a --delete --exclude 'META-INF/persistence.xml' \
