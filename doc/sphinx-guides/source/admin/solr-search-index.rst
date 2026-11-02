@@ -6,6 +6,26 @@ A Dataverse installation requires Solr to be operational at all times. If you st
 .. contents:: Contents:
 	:local:
 
+Embedding Vector Configuration
+------------------------------
+
+The schema declares an optional ``dataset_embedding`` vector field and three optional, single-valued metadata fields: ``embedder``, ``embedding_source_hash``, and ``embedding_pipeline``. These fields have no DocValues and are not copied into the keyword-search catch-all field. Declaring them does not enable embedding generation or semantic search.
+
+Before enabling embedding generation or semantic search, configure both of these JVM system properties in **Solr**, not the Dataverse/Payara JVM:
+
+* ``solr.embedding.dimension``: the selected model's configured positive output dimension, within the deployed Solr/Lucene version's supported limits.
+* ``solr.embedding.similarity``: a Solr-supported similarity function consistent with the model and the document/query normalization strategy.
+
+Supply the properties using ``-Dsolr.embedding.dimension=...`` and ``-Dsolr.embedding.similarity=...`` in Solr's existing ``SOLR_OPTS`` configuration (for example, in ``solr.in.sh``). Replace the ellipses with the actual deployment values; they are not defaults. For the development Docker Compose environment, pass ``SOLR_OPTS`` to the ``dev_solr`` service. Preserve any existing JVM options and configure every Solr node hosting the collection consistently.
+
+The schema defaults to one dimension and cosine similarity so keyword-only installations can load the core without embedding configuration. These startup defaults do not select an embedding model or enable semantic search. Before indexing vectors, explicitly configure dimensions and similarity for the chosen model; live schema validation rejects mismatches with Dataverse configuration. Invalid explicit Solr property values can still prevent core loading. Existing documents remain valid without embedding fields.
+
+Before enabling embedding generation or semantic search, define the encoding contract: included metadata fields and ordering, text preparation, input-length handling, model-specific document/query processing, output dimensions, and normalization. Only then assign its ``embedding_pipeline`` identifier. Record the model identifier, including an immutable revision where available, in ``embedder``. Do not use placeholder model or pipeline identifiers.
+
+Embedding producers must validate document and query vector lengths against the configured Solr dimension. After successful generation, write the vector and all three metadata values together; ``embedding_source_hash`` is the SHA-256 of the exact prepared text submitted for embedding. Replacement documents must omit all four fields on generation failure or ineligibility. Semantic queries must filter by the active ``embedder`` and compatible ``embedding_pipeline`` while retaining authorization and other filters. These producer and query behaviors are integration requirements, not functionality provided by the schema itself.
+
+Changing dimensions or similarity requires rebuilding the vector index. Changing the model or encoding contract requires regenerating affected embeddings; updating JVM properties alone does not migrate existing vectors.
+
 Full Reindex
 -------------
 

@@ -271,6 +271,10 @@ public class SearchFields {
      * Datasets can be software, workflow, etc. See the DatasetType object.
      */
     public static final String DATASET_TYPE = "datasetType";
+    public static final String DATASET_EMBEDDING = "dataset_embedding";
+    public static final String EMBEDDER = "embedder";
+    public static final String EMBEDDING_SOURCE_HASH = "embedding_source_hash";
+    public static final String EMBEDDING_PIPELINE = "embedding_pipeline";
 
     public static final String OBSERVATIONS = "observations";
     public static final String VARIABLE_COUNT = "variableCount";

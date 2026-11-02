@@ -214,6 +214,11 @@
     <field name="datasetVersionId" type="plong" stored="true" indexed="true" multiValued="false"/>
     <field name="datasetType" type="string" stored="true" indexed="true" multiValued="false"/>
 
+    <field name="dataset_embedding" type="dataset_embedding_vector" indexed="true" stored="false" required="false" multiValued="false" docValues="false"/>
+    <field name="embedder" type="string" indexed="true" stored="true" required="false" multiValued="false" docValues="false"/>
+    <field name="embedding_source_hash" type="string" indexed="false" stored="true" required="false" multiValued="false" docValues="false"/>
+    <field name="embedding_pipeline" type="string" indexed="true" stored="true" required="false" multiValued="false" docValues="false"/>
+
     <!-- Added for Dataverse 4.0 alpha 1 to sort by name  -->
     <!-- https://redmine.hmdc.harvard.edu/issues/3482 -->
     <!-- 'Sorting can be done on the "score" of the document, or on any multiValued="false" indexed="true" field provided that field is either non-tokenized (ie: has no Analyzer) or uses an Analyzer that only produces a single Term (ie: uses the KeywordTokenizer)' http://wiki.apache.org/solr/CommonQueryParameters#sort -->
@@ -801,6 +806,11 @@
         <!-- <filter class="solr.PatternReplaceFilterFactory" pattern="([^a-z])" replacement="" replace="all" /> -->
         </analyzer>
     </fieldType>
+
+    <!-- Keyword-only startup defaults; configure model-compatible Solr JVM properties before embedding; see the Solr Search Index admin guide. -->
+    <fieldType name="dataset_embedding_vector" class="solr.DenseVectorField"
+               vectorDimension="${solr.embedding.dimension:1}"
+               similarityFunction="${solr.embedding.similarity:cosine}"/>
 
     <!-- The StrField type is not analyzed, but indexed/stored verbatim. -->
     <fieldType name="string" class="solr.StrField" sortMissingLast="true" docValues="true" />
