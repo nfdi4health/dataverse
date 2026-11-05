@@ -809,6 +809,7 @@
 
     <!-- Keyword-only startup defaults; configure model-compatible Solr JVM properties before embedding; see the Solr Search Index admin guide. -->
     <fieldType name="dataset_embedding_vector" class="solr.DenseVectorField"
+               vectorEncoding="FLOAT32"
                vectorDimension="${solr.embedding.dimension:1}"
                similarityFunction="${solr.embedding.similarity:cosine}"/>
 

@@ -56,6 +56,7 @@ public class EmbeddingSchemaTest {
         Element vectorType = definition("fieldType", "dataset_embedding_vector");
         assertAll("dataset_embedding_vector",
                 () -> assertEquals("solr.DenseVectorField", vectorType.getAttribute("class")),
+                () -> assertEquals("FLOAT32", vectorType.getAttribute("vectorEncoding")),
                 () -> assertEquals("${solr.embedding.dimension:1}", vectorType.getAttribute("vectorDimension")),
                 () -> assertEquals("${solr.embedding.similarity:cosine}", vectorType.getAttribute("similarityFunction")));
     }
