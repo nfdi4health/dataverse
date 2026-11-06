@@ -162,6 +162,9 @@ public class IndexServiceBean {
     @Inject
     DatasetVersionFilesServiceBean datasetVersionFilesServiceBean;
 
+    @Inject
+    DatasetEmbeddingService datasetEmbeddingService;
+
     public static final String solrDocIdentifierDataverse = "dataverse_";
     public static final String solrDocIdentifierFile = "datafile_";
     public static final String solrDocIdentifierDataset = "dataset_";
@@ -1364,6 +1367,7 @@ public class IndexServiceBean {
         if (versionNote != null) {
             solrInputDocument.addField(SearchFields.DATASET_VERSION_NOTE, versionNote);
         }
+        addDatasetEmbedding(indexableDataset, solrInputDocument);
         docs.add(solrInputDocument);
 
         /**
@@ -1748,6 +1752,24 @@ public class IndexServiceBean {
         return new SolrInputDocuments(docs, msg, datasetId);
     }
     
+    private void addDatasetEmbedding(IndexableDataset indexableDataset, SolrInputDocument document) {
+        if (indexableDataset.getDatasetState() != DatasetState.PUBLISHED) {
+            return;
+        }
+        try {
+            if (FeatureFlags.SEMANTIC_EMBEDDINGS.enabled()) {
+                datasetEmbeddingService.addEmbedding(document, solrClientService.getSolrUrl());
+            }
+        } catch (EmbeddingException | RuntimeException ex) {
+            DatasetEmbeddingService.removeEmbedding(document);
+            // Transport/configuration exceptions can include secrets or input; log only sanitized errors.
+            String reason = ex instanceof EmbeddingException ? ex.getMessage() : "Unexpected embedding configuration or processing failure.";
+            DatasetVersion version = indexableDataset.getDatasetVersion();
+            logger.log(Level.WARNING, "Embedding omitted for dataset {0}, version {1}: {2} Keyword indexing continues; retry using dataset reindexing.",
+                    new Object[]{version.getDataset().getId(), version.getId(), reason});
+        }
+    }
+
     private String addOrUpdateDataset(IndexableDataset indexableDataset, Set<Long> datafilesInDraftVersion) throws  SolrServerException, IOException {   
         final SolrInputDocuments docs = toSolrDocs(indexableDataset, datafilesInDraftVersion);
 

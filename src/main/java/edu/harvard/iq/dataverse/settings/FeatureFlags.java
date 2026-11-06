@@ -140,6 +140,14 @@ public enum FeatureFlags {
      */
     VERSION_NOTE("enable-version-note"),
 
+    /**
+     * Generates embeddings for published dataset documents during ordinary indexing.
+     * Endpoint configuration alone does not enable generation.
+     * @apiNote Raise flag by setting "dataverse.feature.semantic-embeddings".
+     * @since Dataverse 7.0
+     */
+    SEMANTIC_EMBEDDINGS("semantic-embeddings"),
+
     ;
     
     final String flag;
