@@ -2698,6 +2698,17 @@ Defaults to ``4``.
 
 Can also be set via *MicroProfile Config API* sources, e.g. the environment variable ``DATAVERSE_SOLR_CONCURRENCY_MAX_ASYNC_INDEXES``.
 
+.. _dataverse.embedding:
+
+dataverse.embedding.*
++++++++++++++++++++++
+
+These Dataverse/Payara runtime settings configure optional document embedding generation through the implemented ``ollama`` or ``openai-compatible`` protocol. They have no deployment defaults. Generation also requires explicitly enabling ``dataverse.feature.semantic-embeddings=true`` (see :ref:`feature-flags`); configuring an endpoint alone does not enable it.
+
+See :ref:`dataset-embedding-settings` for every ``dataverse.embedding.*`` key, required and conditional values, authentication, model identity, normalization, document prefix, Unicode input limits, and timeout requirements. See :ref:`dataset-embedding-generation` for the processing contract, live Solr Schema API validation, failure behavior, and reindexing requirements. Missing or invalid embedding configuration omits embeddings while keyword indexing continues. This feature does not implement semantic queries or change the search UI.
+
+These settings can be supplied through JVM properties or supported MicroProfile Config sources. Keep bearer tokens in protected runtime configuration. The separate ``solr.embedding.dimension`` and ``solr.embedding.similarity`` JVM properties belong to **Solr**, not Payara; configure them for the selected model before enabling embedding generation or semantic search. Keyword-only installations can use the schema startup defaults of one dimension and cosine similarity.
+
 dataverse.rserve.host
 +++++++++++++++++++++
 
@@ -3520,6 +3531,9 @@ please find all known feature flags below. Any of these flags can be activated u
       - ``Off``
     * - enable-version-note
       - Turns on the ability to add/view/edit/delete per-dataset-version notes intended to provide :ref:`provenance` information about why the dataset/version was created.  
+      - ``Off``
+    * - semantic-embeddings
+      - Enables embedding generation for published dataset documents during ordinary indexing and reindexing. Set ``dataverse.feature.semantic-embeddings=true`` and explicitly configure :ref:`dataverse.embedding`. Does not enable semantic queries or change keyword search or the UI. Disabling it removes embedding fields on subsequent replacement indexing, not immediately from existing documents. See :ref:`dataset-embedding-generation`.
       - ``Off``
 
 **Note:** Feature flags can be set via any `supported MicroProfile Config API source`_, e.g. the environment variable
