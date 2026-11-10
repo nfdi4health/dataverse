@@ -148,6 +148,14 @@ public enum FeatureFlags {
      */
     SEMANTIC_EMBEDDINGS("semantic-embeddings"),
 
+    /**
+     * Enables semantic retrieval independently of document embedding generation.
+     * Existing vectors can be searched while generation is disabled.
+     * @apiNote Raise flag by setting "dataverse.feature.semantic-search".
+     * @since Dataverse 7.0
+     */
+    SEMANTIC_SEARCH("semantic-search"),
+
     ;
     
     final String flag;

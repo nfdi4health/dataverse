@@ -85,8 +85,15 @@ public enum JvmSettings {
     EMBEDDING_PROCESSOR(SCOPE_EMBEDDING, "processor"),
     EMBEDDING_DOCUMENT_PREFIX_MODE(SCOPE_EMBEDDING, "document-prefix-mode"),
     EMBEDDING_DOCUMENT_PREFIX(SCOPE_EMBEDDING, "document-prefix"),
+    EMBEDDING_QUERY_PREFIX_MODE(SCOPE_EMBEDDING, "query-prefix-mode"),
+    EMBEDDING_QUERY_PREFIX(SCOPE_EMBEDDING, "query-prefix"),
     EMBEDDING_MAX_INPUT_CODE_POINTS(SCOPE_EMBEDDING, "max-input-code-points"),
     EMBEDDING_INPUT_LIMIT_ACTION(SCOPE_EMBEDDING, "input-limit-action"),
+
+    // SEMANTIC RETRIEVAL (loaded only for semantic requests)
+    SCOPE_SEARCH(PREFIX, "search"),
+    SCOPE_SEARCH_SEMANTIC(SCOPE_SEARCH, "semantic"),
+    SEARCH_SEMANTIC_TOP_K(SCOPE_SEARCH_SEMANTIC, "top-k"),
 
     // INDEX CONCURENCY
     SCOPE_SOLR_CONCURENCY(SCOPE_SOLR, "concurrency"),
