@@ -13,7 +13,7 @@ Embedding Generation and Vector Configuration
 
 Dataverse can generate embeddings for **published dataset documents** during ordinary indexing and reindexing. Enable this explicitly with ``dataverse.feature.semantic-embeddings=true`` in the Dataverse/Payara runtime configuration (see :ref:`feature-flags`). The flag is off unless enabled; configuring an endpoint alone does not enable generation. Draft and deaccessioned dataset documents, file documents, and Dataverse collection documents do not receive embeddings.
 
-This implements document embedding generation only. It does **not** change keyword search, ranking, search APIs, or the user interface, and does not implement semantic queries or query embeddings. There is no query-prefix setting. A future query implementation must define a compatible query encoding contract, validate query vector lengths, filter by the active ``embedder`` and compatible ``embedding_pipeline``, and retain authorization and other search filters.
+Document generation and query embedding preparation do **not** change keyword search, ranking, search APIs, or the user interface. The query embedding service described below prepares vectors and compatible document provenance; it does not execute retrieval. A retrieval implementation must filter by the returned ``embedder`` and compatible ``embedding_pipeline`` and retain authorization and other search filters.
 
 The schema declares an optional ``dataset_embedding`` vector field and three optional, single-valued metadata fields: ``embedder``, ``embedding_source_hash``, and ``embedding_pipeline``. These fields have no DocValues and are not copied into the keyword-search catch-all field. Declaring them does not enable generation or semantic search.
 
@@ -38,7 +38,7 @@ For example, a deployment may select model ``qwen3-embedding:8b`` with ``4096`` 
 Dataverse Runtime Settings
 ++++++++++++++++++++++++++
 
-Set the following keys in the **Dataverse/Payara** runtime, using JVM properties or other supported MicroProfile Config sources (see :ref:`jvm-options`). All names below begin with ``dataverse.embedding.``. There are **no deployment defaults** for these settings: the endpoint, model, dimensions, timeouts, normalization, prefix mode, and input-limit policy must be selected explicitly. **REQUIRED** means required when generation is enabled, not a suggested value. Conditional settings must follow their selected mode.
+Set the following keys in the **Dataverse/Payara** runtime, using JVM properties or other supported MicroProfile Config sources (see :ref:`jvm-options`). All names below begin with ``dataverse.embedding.``. There are **no deployment defaults** for these settings: the endpoint, model, dimensions, timeouts, normalization, prefix mode, and input-limit policy must be selected explicitly. **REQUIRED** means required for document generation or query embedding requests, not a suggested value. Document-processing settings are also needed for queries to derive the compatible document pipeline identifier. Conditional settings must follow their selected mode.
 
 .. list-table:: Embedding settings
    :header-rows: 1
@@ -79,7 +79,33 @@ Set the following keys in the **Dataverse/Payara** runtime, using JVM properties
    * - ``dataverse.embedding.max-input-code-points``
      - **REQUIRED**: positive Java integer limiting the complete prepared input, **including the prefix**, in Unicode code points, not bytes, UTF-16 code units, or model tokens. Select it for the deployed model/service; no input cap or token-limit conversion is supplied.
    * - ``dataverse.embedding.input-limit-action``
-     - **REQUIRED**: ``reject`` or ``truncate``. ``reject`` omits the embedding if the prepared input exceeds the limit. ``truncate`` shortens only metadata content and retains the entire prefix, without splitting surrogate pairs.
+     - **REQUIRED**: ``reject`` or ``truncate``. ``reject`` fails embedding preparation if the input exceeds the limit (document indexing continues without an embedding). ``truncate`` shortens only metadata or query content and retains the entire selected prefix, without splitting surrogate pairs.
+
+Query Embedding Configuration and Compatibility
+++++++++++++++++++++++++++++++++++++++++++++++++
+
+Enable semantic retrieval explicitly with ``dataverse.feature.semantic-search=true``. This flag is independent of ``dataverse.feature.semantic-embeddings``: searching existing vectors does not require document generation to be enabled. Both flags are off unless explicitly enabled. The query embedding service checks only the semantic-search flag.
+
+The following settings have **no deployment defaults** and are loaded only for semantic requests. Missing or invalid query settings do not affect document indexing or keyword search.
+
+.. list-table:: Query-only settings
+   :header-rows: 1
+   :widths: 38 62
+
+   * - Key
+     - Requirement and behavior
+   * - ``dataverse.embedding.query-prefix-mode``
+     - **REQUIRED**: ``none`` or ``literal``. ``none`` uses no query prefix and ignores ``query-prefix``.
+   * - ``dataverse.embedding.query-prefix``
+     - **REQUIRED for literal**: nonempty prefix applied exactly, with no implicit separator. Include any required separator in the value. Unset it for ``none`` to avoid misleading configuration.
+   * - ``dataverse.search.semantic.top-k``
+     - **REQUIRED**: positive Java integer specifying the fixed retrieval candidate window, not a per-request override. The query embedding result carries this value for retrieval callers.
+
+Queries must be nonblank natural-language text. Text is preserved without trimming or keyword-query parsing. The selected query prefix counts toward the shared ``max-input-code-points`` limit. ``reject`` fails an over-limit query; ``truncate`` retains the entire prefix and only as many leading query code points as fit, without splitting surrogate pairs. A prefix that leaves no room for query content, or truncation that leaves only blank query content, fails rather than embedding the prefix alone.
+
+Queries reuse the document deployment's endpoint, protocol, model, revision checks, authentication, dimensions, similarity, normalization, timeouts, response-size bound, and input-limit policy. Each query validates the live Solr schema before calling the existing embedding client. Successful preparation returns the validated vector, the client's model identity, and the compatible document pipeline identifier derived by the configured document processor. Query prefix and top-K settings do **not** enter or change the document pipeline hash, and no separate query pipeline setting is introduced.
+
+Document and query prefixes may differ when the selected model requires asymmetric encoding. Establish their compatibility from the **selected model's contract**, including any required instruction and separator, not from its name or the pipeline identifier. Dataverse does not infer prefixes or model compatibility from a model name. Changing only the query prefix does not require regenerating document vectors if the new prefix remains compatible with their encoding contract.
 
 Model Identity, Transport, and Service Responsibilities
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -92,7 +118,7 @@ For **OpenAI-compatible** services, Dataverse sends ``model``, the prepared ``in
 
 For either protocol, the response must contain exactly one vector (at index zero for OpenAI-compatible responses), of the configured length, with numeric, finite components representable as floats. ``l2`` rejects a zero or nonfinite norm and otherwise normalizes before storing the float vector. ``none`` leaves components unnormalized before conversion to floats. For cosine similarity, the converted vector must additionally have a positive finite float-accumulated squared norm; vectors whose norms underflow or overflow are rejected, not silently normalized.
 
-HTTP is supported for local deployments, but a bearer token sent over HTTP is unencrypted; use HTTPS for bearer authentication. Protect the runtime token and endpoint access. The prepared dataset metadata is sent to the configured embedding service, so select a service consistent with deployment privacy, cost, and availability requirements. Redirects are disabled for service and live-schema requests. Embedding failures use sanitized messages rather than raw input, tokens, endpoints, response bodies, or transport exception details.
+HTTP is supported for local deployments, but a bearer token sent over HTTP is unencrypted; use HTTPS for bearer authentication. Protect the runtime token and endpoint access. Prepared dataset metadata and natural-language query text are sent to the configured embedding service, so select a service consistent with deployment privacy, cost, and availability requirements. Redirects are disabled for service and live-schema requests. Embedding failures use sanitized messages rather than raw input, tokens, endpoints, response bodies, or transport exception details.
 
 Basic Document Processing and Input Limits
 ++++++++++++++++++++++++++++++++++++++++++
@@ -126,7 +152,7 @@ After successful text preparation, live schema validation, and embedding generat
 * ``embedding_source_hash``: lowercase hexadecimal SHA-256 of the **exact UTF-8 text submitted**, after prefixing and any client-side truncation.
 * ``embedding_pipeline``: ``basic-v1-<sha256>`` derived deterministically from the processor's canonical encoding-contract configuration, not an operator-assigned string or setting.
 
-The pipeline hash covers the processor/version, ordered source fields, concatenation and Unicode input-limit rules, protocol, effective document prefix, code-point limit, limit action, normalization, dimensions, and similarity. The canonical manifest length-frames each value using its Java string length before hashing its UTF-8 bytes. Model identity is recorded separately in ``embedder``; endpoint, credentials, and timeout values are not part of this pipeline hash. A later query implementation must honor this document contract when defining compatible query processing; this identifier does not mean query processing is already implemented.
+The pipeline hash covers the processor/version, ordered source fields, concatenation and Unicode input-limit rules, protocol, effective document prefix, code-point limit, limit action, normalization, dimensions, and similarity. The canonical manifest length-frames each value using its Java string length before hashing its UTF-8 bytes. Model identity is recorded separately in ``embedder``; endpoint, credentials, and timeout values are not part of this pipeline hash. Query embedding preparation reuses this identifier unchanged to identify compatible document processing; query prefixes are configured separately and are not added to the manifest.
 
 Missing or invalid runtime configuration, schema mismatches or schema-access failures, input-limit rejection, model-identity failures, transport failures, or invalid vectors fail closed **for embeddings only**. The dataset still proceeds through keyword indexing, without any of the four embedding fields, and a sanitized warning identifies the dataset/version for retry by reindexing. Empty prepared content also omits the fields. This does not make an unavailable Solr core usable: the Solr schema must still load for ordinary indexing to succeed.
 
