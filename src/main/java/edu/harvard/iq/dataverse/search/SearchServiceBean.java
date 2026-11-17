@@ -58,6 +58,10 @@ public class SearchServiceBean {
 
     private static final String ALL_GROUPS = "*";
 
+    public enum RetrievalMode {
+        KEYWORD, SEMANTIC
+    }
+
     /**
      * We're trying to make the SearchServiceBean lean, mean, and fast, with as
      * few injections of EJBs as possible.
@@ -81,6 +85,8 @@ public class SearchServiceBean {
     PermissionServiceBean permissionService;
     @Inject
     ThumbnailServiceWrapper thumbnailServiceWrapper;
+    @Inject
+    QueryEmbeddingService queryEmbeddingService;
     
     /**
      * Import note: "onlyDatatRelatedToMe" relies on filterQueries for providing
@@ -180,7 +186,47 @@ public class SearchServiceBean {
             boolean addFacets,
             boolean addHighlights
     ) throws SearchException {
+        return search(dataverseRequest, dataverses, query, filterQueries, sortField, sortOrder,
+                paginationStart, onlyDatatRelatedToMe, numResultsPerPage, retrieveEntities,
+                geoPoint, geoRadius, addFacets, addHighlights, RetrievalMode.KEYWORD);
+    }
 
+    /**
+     * Shared retrieval and hydration path. Semantic counts and facets describe the
+     * retrieved candidate set, not the relevant corpus. On the configured standalone
+     * Solr 9.8 core this is at most topK; distributed Solr instead counts the union
+     * of shard-local topK sets (and requires shard-local permission documents).
+     *
+     * @throws IllegalArgumentException for invalid mode, query, paging, or My Data arguments
+     * @throws SearchException for unavailable embedding configuration/services or Solr
+     */
+    public SolrQueryResponse search(
+            DataverseRequest dataverseRequest,
+            List<Dataverse> dataverses,
+            String query,
+            List<String> filterQueries,
+            String sortField,
+            String sortOrder,
+            int paginationStart,
+            boolean onlyDatatRelatedToMe,
+            int numResultsPerPage,
+            boolean retrieveEntities,
+            String geoPoint,
+            String geoRadius,
+            boolean addFacets,
+            boolean addHighlights,
+            RetrievalMode retrievalMode
+    ) throws SearchException {
+        if (retrievalMode == null) {
+            throw new IllegalArgumentException("retrievalMode is required");
+        }
+        boolean semantic = retrievalMode == RetrievalMode.SEMANTIC;
+        if (semantic && onlyDatatRelatedToMe) {
+            throw new IllegalArgumentException("Semantic search does not support show_my_data");
+        }
+        if (semantic && (query == null || query.isBlank())) {
+            throw new IllegalArgumentException("Semantic search requires nonblank query text");
+        }
         if (paginationStart < 0) {
             throw new IllegalArgumentException("paginationStart must be 0 or greater");
         }
@@ -189,13 +235,17 @@ public class SearchServiceBean {
         }
 
         SolrQuery solrQuery = new SolrQuery();
-        query = SearchUtil.sanitizeQuery(query);
-
-        solrQuery.setQuery(query);
-        if (sortField != null) {
-            // is it ok not to specify any sort? - there are cases where we 
-            // don't care, and it must cost some extra cycles -- L.A.
-            solrQuery.setSort(new SortClause(sortField, sortOrder));
+        if (semantic) {
+            configureSemanticQuery(solrQuery, query, paginationStart, numResultsPerPage);
+            addHighlights = false;
+        } else {
+            query = SearchUtil.sanitizeQuery(query);
+            solrQuery.setQuery(query);
+            if (sortField != null) {
+                // is it ok not to specify any sort? - there are cases where we
+                // don't care, and it must cost some extra cycles -- L.A.
+                solrQuery.setSort(new SortClause(sortField, sortOrder));
+            }
         }
         
         solrQuery.setParam("fl", "*,score");
@@ -379,7 +429,9 @@ public class SearchServiceBean {
 //        solrQuery.addNumericRangeFacet(SearchFields.PRODUCTION_DATE_YEAR_ONLY, citationYearRangeStart, citationYearRangeEnd, citationYearRangeSpan);
 //        solrQuery.addNumericRangeFacet(SearchFields.DISTRIBUTION_DATE_YEAR_ONLY, citationYearRangeStart, citationYearRangeEnd, citationYearRangeSpan);
         solrQuery.setRows(numResultsPerPage);
-        logger.fine("Solr query:" + solrQuery);
+        if (!semantic) {
+            logger.fine("Solr query:" + solrQuery);
+        }
 
         // -----------------------------------
         // Make the solr query
@@ -390,6 +442,10 @@ public class SearchServiceBean {
             queryResponse = solrClientService.getSolrClient().query(solrQuery);
 
         } catch (RemoteSolrException ex) {
+            if (semantic) {
+                // Solr errors can echo the vector and full request parameters.
+                throw new SearchException("Semantic search engine unavailable.", null);
+            }
             String messageFromSolr = ex.getLocalizedMessage();
             
             logger.fine("message from the solr exception: "+messageFromSolr+"; code: "+ex.code());
@@ -437,6 +493,9 @@ public class SearchServiceBean {
             exceptionSolrQueryResponse.setSpellingSuggestionsByToken(emptySpellingSuggestion);
             return exceptionSolrQueryResponse;
         } catch (SolrServerException | IOException ex) {
+            if (semantic) {
+                throw new SearchException("Semantic search engine unavailable.", null);
+            }
             throw new SearchException("Internal Dataverse Search Engine Error", ex);
         }
         
@@ -724,7 +783,7 @@ public class SearchServiceBean {
             solrSearchResults.add(solrSearchResult);
         }
         Map<String, List<String>> spellingSuggestionsByToken = new HashMap<>();
-        SpellCheckResponse spellCheckResponse = queryResponse.getSpellCheckResponse();
+        SpellCheckResponse spellCheckResponse = semantic ? null : queryResponse.getSpellCheckResponse();
         if (spellCheckResponse != null) {
             List<SpellCheckResponse.Suggestion> suggestions = spellCheckResponse.getSuggestions();
             for (SpellCheckResponse.Suggestion suggestion : suggestions) {
@@ -975,6 +1034,46 @@ public class SearchServiceBean {
         solrQueryResponse.setPublicationStatusCounts(queryResponse.getFacetField("publicationStatus"));
 
         return solrQueryResponse;
+    }
+
+    private void configureSemanticQuery(SolrQuery solrQuery, String query, int start, int rows)
+            throws SearchException {
+        QueryEmbeddingService.Result embedding;
+        try {
+            embedding = queryEmbeddingService.embed(query, solrClientService.getSolrUrl());
+        } catch (EmbeddingException e) {
+            // EmbeddingException is already sanitized; preserve it for callers.
+            throw new SearchException(e.getMessage(), e);
+        }
+        if (embedding.topK() < 1 || embedding.vector().isEmpty()
+                || embedding.vector().stream().anyMatch(value -> value == null || !Float.isFinite(value))
+                || embedding.modelIdentity().isBlank() || embedding.pipelineIdentifier().isBlank()) {
+            throw new SearchException("Invalid semantic query embedding result.", null);
+        }
+        if ((long) start + rows > embedding.topK()) {
+            throw new IllegalArgumentException("Requested page exceeds the semantic candidate window");
+        }
+        String vector = embedding.vector().stream().map(value -> Float.toString(value))
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        // /select defaults to edismax. Explicit lucene dispatches the top-level
+        // KNN parser, whose implicit graph prefilter includes every fq, including
+        // the permission JOIN and its q1 reference (verified on Solr 9.8.0).
+        solrQuery.set("defType", "lucene");
+        solrQuery.setQuery("{!knn f=" + SearchFields.DATASET_EMBEDDING
+                + " topK=" + embedding.topK() + "}" + vector);
+        solrQuery.setSort(SearchFields.RELEVANCE, SolrQuery.ORDER.desc);
+        solrQuery.addSort(SearchFields.ID, SolrQuery.ORDER.asc);
+        solrQuery.set("semanticModel", embedding.modelIdentity());
+        solrQuery.set("semanticPipeline", embedding.pipelineIdentifier());
+        solrQuery.addFilterQuery("{!term f=" + SearchFields.EMBEDDER + " v=$semanticModel}");
+        solrQuery.addFilterQuery("{!term f=" + SearchFields.EMBEDDING_PIPELINE + " v=$semanticPipeline}");
+        solrQuery.addFilterQuery("{!term f=" + SearchFields.TYPE + "}" + SearchConstants.DATASETS);
+        solrQuery.addFilterQuery("{!term f=" + SearchFields.PUBLICATION_STATUS + "}" + IndexServiceBean.PUBLISHED_STRING);
+        solrQuery.set("hl", false);
+        solrQuery.set("spellcheck", false);
+        solrQuery.set("echoParams", "none");
+        solrQuery.set("logParamsList", "qt,start,rows");
+        solrQuery.set("shards.tolerant", false);
     }
 
     public String getLocaleTitle(String title,  String controlledvoc , String propertyfile) {
