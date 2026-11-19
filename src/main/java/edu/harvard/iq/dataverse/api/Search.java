@@ -7,6 +7,7 @@ import edu.harvard.iq.dataverse.search.FacetCategory;
 import edu.harvard.iq.dataverse.search.FacetLabel;
 import edu.harvard.iq.dataverse.search.SolrSearchResult;
 import edu.harvard.iq.dataverse.search.SearchServiceBean;
+import edu.harvard.iq.dataverse.search.SearchServiceBean.RetrievalMode;
 import edu.harvard.iq.dataverse.search.SolrQueryResponse;
 import edu.harvard.iq.dataverse.authorization.users.AuthenticatedUser;
 import edu.harvard.iq.dataverse.authorization.users.GuestUser;
@@ -15,6 +16,8 @@ import edu.harvard.iq.dataverse.search.SearchConstants;
 import edu.harvard.iq.dataverse.search.SearchException;
 import edu.harvard.iq.dataverse.search.SearchUtil;
 import edu.harvard.iq.dataverse.search.SortBy;
+import edu.harvard.iq.dataverse.settings.FeatureFlags;
+import edu.harvard.iq.dataverse.settings.JvmSettings;
 import edu.harvard.iq.dataverse.settings.SettingsServiceBean;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -74,6 +77,7 @@ public class Search extends AbstractApiBean {
             @QueryParam("geo_point") String geoPointRequested,
             @QueryParam("geo_radius") String geoRadiusRequested,
             @QueryParam("show_type_counts") boolean showTypeCounts,
+            @QueryParam("search_mode") String searchMode,
             @Context HttpServletResponse response
     ) {
 
@@ -82,6 +86,25 @@ public class Search extends AbstractApiBean {
             user = getUser(crc);
         } catch (WrappedResponse ex) {
             return ex.getResponse();
+        }
+
+        if (searchMode != null && !searchMode.equals("keyword") && !searchMode.equals("semantic")) {
+            return error(Response.Status.BAD_REQUEST, "search_mode must be keyword or semantic.");
+        }
+        boolean semantic = "semantic".equals(searchMode);
+        if (semantic) {
+            if (query == null || query.isBlank()) {
+                return error(Response.Status.BAD_REQUEST, "Semantic search requires nonblank q.");
+            }
+            if (types.isEmpty() || types.stream().anyMatch(type -> !SearchConstants.DATASET.equals(type))) {
+                return error(Response.Status.BAD_REQUEST, "Semantic search requires explicit type=dataset only.");
+            }
+            if (showMyData) {
+                return error(Response.Status.BAD_REQUEST, "Semantic search does not support show_my_data=true.");
+            }
+            if (paginationStart < 0) {
+                return error(Response.Status.BAD_REQUEST, "start must be 0 or greater.");
+            }
         }
 
         if (query != null) {
@@ -106,6 +129,10 @@ public class Search extends AbstractApiBean {
                     filterQueries.add(SearchFields.TYPE + ":(" + SearchConstants.DATAVERSES + " OR " + SearchConstants.DATASETS + " OR " + SearchConstants.FILES + ")");
                 }
                 sortBy = SearchUtil.getSortBy(sortField, sortOrder);
+                if (semantic && (!SearchFields.RELEVANCE.equals(sortBy.getField())
+                        || !SortBy.DESCENDING.equals(sortBy.getOrder()))) {
+                    return error(Response.Status.BAD_REQUEST, "Semantic search requires relevance-descending sorting (sort=score&order=desc).");
+                }
                 numResultsPerPage = getNumberOfResultsPerPage(numResultsPerPageRequested);
                 
                  // we have to add "" (root) otherwise there is no permissions check
@@ -138,6 +165,25 @@ public class Search extends AbstractApiBean {
                 return error(Response.Status.BAD_REQUEST, ex.getLocalizedMessage());
             }
 
+            int semanticTopK = 0;
+            if (semantic) {
+                try {
+                    if (!FeatureFlags.SEMANTIC_SEARCH.enabled()) {
+                        return semanticUnavailable();
+                    }
+                    semanticTopK = Integer.parseInt(JvmSettings.SEARCH_SEMANTIC_TOP_K.lookupOptional().orElse(""));
+                    if (semanticTopK < 1) {
+                        return semanticUnavailable();
+                    }
+                } catch (RuntimeException ex) {
+                    return semanticUnavailable();
+                }
+                // Validate before the EJB call, where unchecked request errors can be wrapped.
+                if ((long) paginationStart + numResultsPerPage > semanticTopK) {
+                    return error(Response.Status.BAD_REQUEST, "Requested page exceeds the semantic candidate window.");
+                }
+            }
+
             // users can't change these (yet anyway)
             boolean dataRelatedToMe = showMyData; //getDataRelatedToMe();
             
@@ -156,9 +202,13 @@ public class Search extends AbstractApiBean {
                         geoPoint,
                         geoRadius,
                         showFacets, // facets are expensive, no need to ask for them if not requested
-                        showRelevance // no need for highlights unless requested either
+                        showRelevance && !semantic, // semantic scores do not require lexical highlights
+                        semantic ? RetrievalMode.SEMANTIC : RetrievalMode.KEYWORD
                 );
             } catch (SearchException ex) {
+                if (semantic) {
+                    return semanticUnavailable();
+                }
                 Throwable cause = ex;
                 StringBuilder sb = new StringBuilder();
                 sb.append(cause + " ");
@@ -171,6 +221,15 @@ public class Search extends AbstractApiBean {
                 String message = "Exception running search for [" + query + "] with filterQueries " + filterQueries + " and paginationStart [" + paginationStart + "]: " + sb.toString();
                 logger.info(message);
                 return error(Response.Status.INTERNAL_SERVER_ERROR, message);
+            } catch (RuntimeException ex) {
+                if (semantic) {
+                    // EJB wrappers and provider failures may contain sensitive cause chains.
+                    return semanticUnavailable();
+                }
+                throw ex;
+            }
+            if (semantic && (solrQueryResponse.hasError() || solrQueryResponse.isSolrTemporarilyUnavailable())) {
+                return semanticUnavailable();
             }
 
             JsonArrayBuilder itemsArrayBuilder = Json.createArrayBuilder();
@@ -180,8 +239,10 @@ public class Search extends AbstractApiBean {
             }
 
             JsonObjectBuilder spelling_alternatives = Json.createObjectBuilder();
-            for (Map.Entry<String, List<String>> entry : solrQueryResponse.getSpellingSuggestionsByToken().entrySet()) {
-                spelling_alternatives.add(entry.getKey(), entry.getValue().toString());
+            if (!semantic) {
+                for (Map.Entry<String, List<String>> entry : solrQueryResponse.getSpellingSuggestionsByToken().entrySet()) {
+                    spelling_alternatives.add(entry.getKey(), entry.getValue().toString());
+                }
             }
 
             JsonObjectBuilder value = Json.createObjectBuilder()
@@ -190,6 +251,12 @@ public class Search extends AbstractApiBean {
                     .add("start", solrQueryResponse.getResultsStart())
                     .add("spelling_alternatives", spelling_alternatives)
                     .add("items", itemsArrayBuilder.build());
+
+            if (semantic) {
+                value.add("search_mode", "semantic")
+                        .add("top_k", semanticTopK)
+                        .add("result_scope", "top_k");
+            }
 
             if (showFacets) {
                 JsonArrayBuilder facets = Json.createArrayBuilder();
@@ -274,6 +341,10 @@ public class Search extends AbstractApiBean {
         } else {
             return error(Response.Status.BAD_REQUEST, "q parameter is missing");
         }
+    }
+
+    private Response semanticUnavailable() {
+        return error(Response.Status.SERVICE_UNAVAILABLE, "Semantic search is temporarily unavailable.");
     }
 
     private User getUser(ContainerRequestContext crc) throws WrappedResponse {
