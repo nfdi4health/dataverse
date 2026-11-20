@@ -3,6 +3,7 @@ package edu.harvard.iq.dataverse.api;
 import io.restassured.RestAssured;
 import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
 import edu.harvard.iq.dataverse.settings.SettingsServiceBean;
 
 import java.util.List;
@@ -15,6 +16,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import edu.harvard.iq.dataverse.util.FileUtil;
 import java.io.File;
 import java.io.InputStream;
@@ -55,6 +60,114 @@ public class SearchIT {
         makeSureTokenlessSearchIsEnabled.then().assertThat()
                 .statusCode(OK.getStatusCode());
 
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unknown", ""})
+    public void testSearchRejectsInvalidMode(String mode) {
+        RestAssured.given()
+                .queryParam("q", "ocean temperature")
+                .queryParam("type", "dataset")
+                .queryParam("search_mode", mode)
+                .get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", " \t\r\n "})
+    public void testSemanticSearchRequiresNonblankQuery(String query) {
+        RequestSpecification request = RestAssured.given()
+                .queryParam("search_mode", "semantic")
+                .queryParam("type", "dataset");
+        if (query != null) {
+            request.queryParam("q", query);
+        }
+        request.get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "file", "dataverse", "dataset,file", "dataset,dataverse", "file,dataverse"})
+    public void testSemanticSearchRequiresDatasetTypeOnly(String types) {
+        RequestSpecification request = RestAssured.given()
+                .queryParam("q", "ocean temperature")
+                .queryParam("search_mode", "semantic");
+        if (!types.isEmpty()) {
+            request.queryParam("type", List.of(types.split(",")));
+        }
+        request.get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"name,asc", "name,desc", "date,asc", "date,desc", "relevance,asc"})
+    public void testSemanticSearchRejectsIncompatibleSort(String sort, String order) {
+        RestAssured.given()
+                .queryParam("q", "ocean temperature")
+                .queryParam("type", "dataset")
+                .queryParam("search_mode", "semantic")
+                .queryParam("sort", sort)
+                .queryParam("order", order)
+                .get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @Test
+    public void testSemanticSearchRejectsShowMyData() {
+        RestAssured.given()
+                .queryParam("q", "ocean temperature")
+                .queryParam("type", "dataset")
+                .queryParam("search_mode", "semantic")
+                .queryParam("show_my_data", true)
+                .get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @Test
+    public void testSemanticSearchRejectsNegativeStart() {
+        RestAssured.given()
+                .queryParam("q", "ocean temperature")
+                .queryParam("type", "dataset")
+                .queryParam("search_mode", "semantic")
+                .queryParam("start", -1)
+                .get("/api/search")
+                .then().assertThat()
+                .statusCode(BAD_REQUEST.getStatusCode());
+    }
+
+    @Test
+    public void testKeywordSearchModeCompatibility() {
+        // A unique no-match query keeps comparison independent of fixtures and indexing delays.
+        String query = "dvAlias:search-mode-" + UUID.randomUUID();
+        Response omittedMode = RestAssured.given()
+                .queryParam("q", query)
+                .get("/api/search");
+        Response keywordMode = RestAssured.given()
+                .queryParam("q", query)
+                .queryParam("search_mode", "keyword")
+                .get("/api/search");
+
+        for (Response response : List.of(omittedMode, keywordMode)) {
+            response.then().assertThat()
+                    .statusCode(OK.getStatusCode())
+                    .body("status", is("OK"))
+                    .body("data.q", is(query))
+                    .body("data.total_count", is(0))
+                    .body("data.start", is(0))
+                    .body("data.count_in_response", is(0))
+                    .body("data.items", Matchers.empty())
+                    // Exact key sets also exclude semantic metadata from both response modes.
+                    .body("keySet()", Matchers.containsInAnyOrder("status", "data"))
+                    .body("data.keySet()", Matchers.containsInAnyOrder("q", "total_count", "start",
+                            "spelling_alternatives", "items", "count_in_response"));
+        }
+        assertEquals(omittedMode.jsonPath().getMap("data"), keywordMode.jsonPath().getMap("data"));
     }
 
     @Test
